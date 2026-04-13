@@ -1,0 +1,131 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import MainLayout from "../../../components/layout/MainLayout";
+import PostCard from "../../../components/feed/PostCard";
+import API from "../../../utils/api";
+
+const DUMMY_POSTS = [
+  {
+    _id: "p1",
+    author: { _id: "u1", name: "Rahul Sharma", role: "alumni", isVerified: true, company: "Google" },
+    content: "Just published a new guide on cracking System Design interviews! Check it out.",
+    likes: ["u2", "u3", "u4"],
+    comments: [{ _id: "c1", author: { name: "Arjun" }, content: "Thanks for sharing!" }],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    _id: "p2",
+    author: { _id: "u2", name: "Priya Nair", role: "alumni", isVerified: true, company: "Meta" },
+    content: "Anyone looking for a mock interview this weekend? I have 2 slots available.",
+    likes: ["u1", "u4", "u5", "u6", "u7", "u8"], // Trending
+    comments: [],
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    _id: "p3",
+    author: { _id: "u3", name: "Amit Patel", role: "student", isVerified: false, college: "IIT Bombay" },
+    content: "Just started learning React, any good resources you alumni recommend?",
+    likes: ["u1", "u2"],
+    comments: [],
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+  }
+];
+
+const FilterTabs = ["All", "Connected", "Trending", "Current Activity"];
+
+export default function Feed() {
+  const navigate = useNavigate();
+
+  const [posts, setPosts] = useState([]); // ✅ real posts
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("All");
+
+  // 🔥 FETCH POSTS FROM BACKEND
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const res = await API.get("/posts");
+        if (res.data.posts && res.data.posts.length > 0) {
+          setPosts(res.data.posts);
+        } else {
+          setPosts(DUMMY_POSTS);
+        }
+      } catch (err) {
+        console.error("Error fetching posts", err);
+        setPosts(DUMMY_POSTS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []);
+
+  // 🔥 OPEN PROFILE
+  const openAlumniProfile = (post) => {
+    navigate(`/profile/${post.author._id}`);
+  };
+
+  // 🔥 FILTER LOGIC (adjusted for backend)
+  const filteredPosts = posts.filter((p) => {
+    if (activeTab === "All") return true;
+    if (activeTab === "Connected") return p.author?.isVerified;
+    if (activeTab === "Trending") return (p.likes?.length || 0) >= 5;
+    if (activeTab === "Current Activity") return true;
+    return true;
+  });
+
+  return (
+    <MainLayout>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 0" }}>
+        
+        {/* HEADER */}
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 24 }}>Home Feed</h1>
+          <p style={{ fontSize: 14, color: "gray" }}>
+            Real posts from your network
+          </p>
+        </div>
+
+        {/* FILTER TABS */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+          {FilterTabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 20,
+                background: activeTab === tab ? "#7C5CFC" : "#eee",
+                color: activeTab === tab ? "white" : "#555",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* LOADING */}
+        {loading && <p>Loading posts...</p>}
+
+        {/* POSTS */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filteredPosts.map((post) => (
+            <PostCard
+              key={post._id}
+              post={post}
+              onOpenProfile={() => openAlumniProfile(post)}
+            />
+          ))}
+        </div>
+
+        {/* EMPTY */}
+        {!loading && filteredPosts.length === 0 && (
+          <p style={{ textAlign: "center" }}>No posts found</p>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
