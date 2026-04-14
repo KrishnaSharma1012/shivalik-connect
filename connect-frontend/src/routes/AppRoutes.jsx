@@ -20,6 +20,7 @@ import SessionWorkshopDetails from "../pages/student/SessionWorkshopDetails";
 import MyLearning from "../pages/student/MyLearning";
 import MembershipAlumni from "../pages/student/MembershipAlumni";
 import AlumniItemDetail from "../pages/alumni/Dashboard/ItemDetail";
+import CareerPath from "../pages/student/Dashboard/CareerPath";
 
 // Alumni Pages
 import AlumniFeed from "../pages/alumni/Dashboard/Feed";
@@ -53,6 +54,15 @@ function AppRoutes() {
       <Route path="/signup" element={<Signup />} />
 
       {/* 🔐 Student Routes */}
+      <Route
+        path="/career-path"
+        element={
+          <ProtectedRoute>
+            <CareerPath />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/feed"
         element={

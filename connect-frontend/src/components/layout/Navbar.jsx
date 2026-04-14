@@ -7,6 +7,7 @@ const SEARCH_INDEX = [
   { title: "Feed", path: "/feed", roles: ["student"], keywords: ["posts", "updates", "feed"] },
   { title: "Networking", path: "/networking", roles: ["student"], keywords: ["alumni", "connect", "mentors"] },
   { title: "Academics", path: "/academics", roles: ["student"], keywords: ["courses", "sessions", "workshops"] },
+  { name: "CareerPath", label: "Career Path", path: "/career-path" },
   { title: "Messages", path: "/messages", roles: ["student"], keywords: ["chat", "conversation", "inbox"] },
   { title: "My Learning", path: "/my-learning", roles: ["student"], keywords: ["enrolled", "learning", "courses"] },
   { title: "Membership Alumni", path: "/membership-alumni", roles: ["student"], keywords: ["membership", "subscribe", "alumni"] },
