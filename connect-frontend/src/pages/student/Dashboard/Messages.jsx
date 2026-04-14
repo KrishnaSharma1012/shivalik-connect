@@ -1,18 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import CrownIcon from "../../../components/common/CrownIcon";
+import { useLocation } from "react-router-dom";
+import { getConversations, getMessages, sendMessage } from "../../../services/chatService";
 
-/* ── Icons ── */
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
   </svg>
 );
 
-import API from "../../../utils/api";
-import { useLocation } from "react-router-dom";
-
-/* ── Conversation Item ── */
 function ConversationItem({ chat, active, onClick }) {
   return (
     <div
@@ -47,7 +44,6 @@ function ConversationItem({ chat, active, onClick }) {
   );
 }
 
-/* ── Main ── */
 export default function StudentMessages() {
   const location = useLocation();
   
@@ -57,14 +53,10 @@ export default function StudentMessages() {
   const [input, setInput] = useState("");
   const bottomRef = useRef();
 
-  useEffect(() => {
-    fetchConversations();
-  }, [location.search]);
-
   const fetchConversations = async () => {
     try {
-      const res = await API.get("/messages/conversations");
-      const formatted = res.data.conversations.map(c => ({
+      const data = await getConversations();
+      const formatted = (data.conversations || []).map(c => ({
         id: c.partner?._id,
         name: c.partner?.name,
         company: c.partner?.company || c.partner?.role,
@@ -74,15 +66,14 @@ export default function StudentMessages() {
         avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
         color: "#7C5CFC",
         membershipTaken: c.partner?.alumniPlan === "premium"
-      })).filter(c => c.id); // Valid partners only
+      })).filter(c => c.id);
       
       setConversations(formatted);
       
       const searchParams = new URLSearchParams(location.search);
       const userParam = searchParams.get("user");
       
-      if (userParam) {
-        // Find existing or set temporary active chat
+      if (userParam && !activeChat) {
         const existing = formatted.find(c => c.id === userParam);
         if (existing) {
           setActiveChat(existing);
@@ -102,22 +93,26 @@ export default function StudentMessages() {
   };
 
   useEffect(() => {
-    if (activeChat?.id) {
-       fetchMessages(activeChat.id);
-    }
-  }, [activeChat]);
+    fetchConversations();
+  }, [location.search]);
 
   const fetchMessages = async (userId) => {
     try {
-      const res = await API.get(`/messages/${userId}`);
-      const formatted = res.data.messages.map(m => ({
-         sender: m.sender._id === userId ? "them" : "me",
+      const data = await getMessages(userId);
+      const formatted = (data.messages || []).map(m => ({
+         sender: m.sender?._id === userId || m.sender === userId ? "them" : "me",
          text: m.content,
          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
       }));
       setMessages(formatted);
     } catch(err) { console.error(err); }
   };
+
+  useEffect(() => {
+    if (activeChat?.id) {
+       fetchMessages(activeChat.id);
+    }
+  }, [activeChat]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,16 +123,14 @@ export default function StudentMessages() {
     const textToSend = input.trim();
     setInput("");
     
-    // Optimistic update
     setMessages(prev => [...prev, { sender: "me", text: textToSend, time: "Just now" }]);
     
     try {
-      await API.post(`/messages/${activeChat.id}`, { content: textToSend });
-      fetchConversations(); // refresh side list
+      await sendMessage(activeChat.id, textToSend);
+      fetchConversations();
     } catch (err) { console.error(err); }
   };
 
-  const currentMsgs = messages || [];
   const membershipChats = conversations.filter(c => c.membershipTaken);
   const regularChats = conversations.filter(c => !c.membershipTaken);
 
@@ -145,18 +138,12 @@ export default function StudentMessages() {
     <MainLayout>
       <div style={{ display: "flex", height: "calc(100vh - 108px)", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden" }}>
 
-        {/* LEFT */}
         <div style={{ width: 290, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-
-          {/* Header */}
           <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-              <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Messages</h2>
-            </div>
+            <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 3 }}>Messages</h2>
             <p style={{ fontSize: 12, color: "var(--text-3)" }}>{conversations.length} alumni conversations</p>
           </div>
 
-          {/* Conversations */}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {membershipChats.length > 0 && (
               <>
@@ -182,7 +169,6 @@ export default function StudentMessages() {
           </div>
         </div>
 
-        {/* RIGHT */}
         {!activeChat ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
             <span style={{ fontSize: 48 }}>💬</span>
@@ -190,13 +176,9 @@ export default function StudentMessages() {
           </div>
         ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-
-            {/* Chat header */}
             <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ position: "relative" }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${activeChat.color}22`, display: "flex", alignItems: "center", justifyContent: "center", color: activeChat.color, fontWeight: 700, fontFamily: "Plus Jakarta Sans" }}>
-                  {activeChat.avatar}
-                </div>
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: `${activeChat.color}22`, display: "flex", alignItems: "center", justifyContent: "center", color: activeChat.color, fontWeight: 700, fontFamily: "Plus Jakarta Sans" }}>
+                {activeChat.avatar}
               </div>
               <div>
                 <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)", margin: 0 }}>{activeChat.name}</p>
@@ -204,9 +186,8 @@ export default function StudentMessages() {
               </div>
             </div>
 
-            {/* Messages */}
             <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {currentMsgs.map((msg, i) => (
+              {messages.map((msg, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: msg.sender === "me" ? "flex-end" : "flex-start" }}>
                   <div style={{ maxWidth: "68%", padding: "10px 14px", borderRadius: msg.sender === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.sender === "me" ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)" : "var(--bg-4)", border: msg.sender === "me" ? "none" : "1px solid var(--border)", color: msg.sender === "me" ? "white" : "var(--text)", fontSize: 14, lineHeight: 1.5 }}>
                     <p style={{ margin: 0 }}>{msg.text}</p>
@@ -217,10 +198,7 @@ export default function StudentMessages() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Input area */}
             <div style={{ padding: "10px 16px 12px", borderTop: "1px solid var(--border)" }}>
-
-              {/* Input + Send */}
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input
                   type="text" value={input}

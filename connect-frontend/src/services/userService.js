@@ -1,54 +1,26 @@
-// ⏳ Fake delay (simulate API)
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+import API from "../utils/api";
 
 // 👤 Get current user
 export async function getCurrentUser() {
-  await delay(300);
-
-  const user = JSON.parse(localStorage.getItem("user"));
-  return user;
+  const res = await API.get("/auth/me");
+  return res.data;
 }
+
 
 // ✏️ Update user profile
 export async function updateUserProfile(updatedData) {
-  await delay(400);
-
-  const existingUser = JSON.parse(localStorage.getItem("user")) || {};
-  const newUser = { ...existingUser, ...updatedData };
-
-  localStorage.setItem("user", JSON.stringify(newUser));
-
-  return newUser;
+  const res = await API.put("/users/profile", updatedData);
+  return res.data;
 }
 
 // 🤝 Get all alumni (for networking)
 export async function getAlumni() {
-  await delay(500);
-
-  return [
-    {
-      id: 1,
-      name: "Rahul Sharma",
-      role: "Software Engineer @ Google",
-      college: "IIT Delhi",
-    },
-    {
-      id: 2,
-      name: "Ananya Verma",
-      role: "Frontend Engineer @ Amazon",
-      college: "DTU",
-    },
-    {
-      id: 3,
-      name: "Aman Gupta",
-      role: "Data Scientist @ Microsoft",
-      college: "NIT Trichy",
-    },
-  ];
+  const res = await API.get("/users/alumni");
+  return res.data;
 }
 
 // 🔍 Get single user by ID
 export async function getUserById(id) {
-  const users = await getAlumni();
-  return users.find((user) => user.id === id);
-}
+  const res = await API.get(`/users/${id}`);
+  return res.data;
+}

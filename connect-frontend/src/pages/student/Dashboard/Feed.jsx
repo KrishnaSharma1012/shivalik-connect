@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
 import PostCard from "../../../components/feed/PostCard";
-import API from "../../../utils/api";
+import { getPosts } from "../../../services/feedService";
 
 const DUMMY_POSTS = [
   {
@@ -44,9 +44,9 @@ export default function Feed() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await API.get("/posts");
-        if (res.data.posts && res.data.posts.length > 0) {
-          setPosts(res.data.posts);
+        const data = await getPosts();
+        if (data.posts && data.posts.length > 0) {
+          setPosts(data.posts);
         } else {
           setPosts(DUMMY_POSTS);
         }

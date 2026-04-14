@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import API from "../../utils/api";
+import { loginUser, googleAuth } from "../../services/authService";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
@@ -38,6 +38,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
   const loginWithGoogle = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
@@ -47,19 +49,19 @@ export default function Login() {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         
-        const res = await API.post("/auth/google", {
+        const data = await googleAuth({
           name: userInfo.data.name,
           email: userInfo.data.email,
           avatar: userInfo.data.picture,
           role: form.role
         });
         
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("userId", res.data.user._id);
-        login(res.data.user);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userId", data.user._id);
+        login(data.user);
         
-        if (res.data.user.role === "student") navigate("/feed");
-        else if (res.data.user.role === "alumni") navigate("/alumni/dashboard/feed");
+        if (data.user.role === "student") navigate("/feed");
+        else if (data.user.role === "alumni") navigate("/alumni/dashboard/feed");
         else navigate("/admin");
       } catch (err) {
         setError(err.response?.data?.message || "Google Login failed");
@@ -70,41 +72,35 @@ export default function Login() {
     onError: () => setError("Google Login Failed")
   });
 
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const handleSubmit = async () => {
+    if (!form.email || !form.password) {
+      setError("All fields are required");
+      return;
+    }
 
- const handleSubmit = async () => {
-  if (!form.email || !form.password) {
-    setError("All fields are required");
-    return;
-  }
+    try {
+      setError("");
+      setLoading(true);
 
-  try {
-    setError("");
-    setLoading(true);
+      const data = await loginUser({
+        email: form.email,
+        password: form.password,
+      });
 
-    const res = await API.post("/auth/login", {
-      email: form.email,
-      password: form.password,
-    });
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userId", data.user._id);
+      login(data.user);
 
-    // ✅ STORE TOKEN
-    localStorage.setItem("token", res.data.token);
-    localStorage.setItem("userId", res.data.user._id);
+      if (data.user.role === "student") navigate("/feed");
+      else if (data.user.role === "alumni") navigate("/alumni/dashboard/feed");
+      else navigate("/admin");
 
-    // ✅ update auth context
-    login(res.data.user);
-
-    // ✅ redirect
-    if (res.data.user.role === "student") navigate("/feed");
-    else if (res.data.user.role === "alumni") navigate("/alumni/dashboard/feed");
-    else navigate("/admin");
-
-  } catch (err) {
-    setError(err.response?.data?.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
-};
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const roleAccent = { student: "var(--purple)", alumni: "var(--orange)", admin: "var(--teal)" };
 

@@ -1,46 +1,25 @@
-// 🔐 Fake delay to simulate API
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+import API from "../utils/api";
 
 // 🔑 Login
-export async function loginUser({ email, password, role }) {
-  await delay(500);
-
-  if (!email || !password) {
-    throw new Error("Invalid credentials");
-  }
-
-  // Fake user response (replace with API later)
-  return {
-    id: Date.now(),
-    name: "User",
-    email,
-    role,
-  };
+export async function loginUser({ email, password }) {
+  const res = await API.post("/auth/login", { email, password });
+  return res.data;
 }
 
 // 📝 Signup
-export async function signupUser({
-  name,
-  email,
-  password,
-  role,
-}) {
-  await delay(500);
-
-  if (!name || !email || !password) {
-    throw new Error("All fields are required");
-  }
-
-  return {
-    id: Date.now(),
-    name,
-    email,
-    role,
-  };
+export async function signupUser(payload) {
+  const res = await API.post("/auth/signup", payload);
+  return res.data;
 }
 
 // 🚪 Logout
-export function logoutUser() {
-  // In real app: call backend API
-  return true;
+export async function logoutUser() {
+  const res = await API.post("/auth/logout");
+  return res.data;
 }
+
+// 🌐 Google Login
+export async function googleAuth(payload) {
+  const res = await API.post("/auth/google", payload);
+  return res.data;
+}

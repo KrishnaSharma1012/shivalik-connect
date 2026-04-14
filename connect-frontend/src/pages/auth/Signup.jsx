@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import API from "../../utils/api";
+import { signupUser, googleAuth } from "../../services/authService";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import CrownIcon from "../../components/common/CrownIcon";
@@ -31,17 +31,14 @@ export default function Signup() {
   const location = useLocation();
   const { login } = useAuth();
 
-  // Pre-populate from navigation state (e.g. coming from AlumniModelGate upgrade CTA)
   const routeState = location.state || {};
-
-  const [step, setStep] = useState(routeState.role ? 2 : 1); // skip role step if pre-filled
+  const [step, setStep] = useState(routeState.role ? 2 : 1);
   const [form, setForm] = useState({
     name: "", email: "", password: "", confirmPassword: "",
     role: routeState.role || "",
     college: "", company: "",
     alumniPlan: routeState.plan || "simple",
   });
-  // When navigating back to step 1, the pre-filled role stays selected
   const [roleLocked] = useState(!!routeState.role);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,20 +56,19 @@ export default function Signup() {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
 
-        const res = await API.post("/auth/google", {
+        const data = await googleAuth({
           name: userInfo.data.name,
           email: userInfo.data.email,
           avatar: userInfo.data.picture,
           role: form.role,
         });
 
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("userId", res.data.user._id);
-        login(res.data.user);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userId", data.user._id);
+        login(data.user);
 
-        // If alumni, optionally send them to plan selection or direct to feed
         if (form.role === "alumni") {
-          setStep(3); // Let them choose a plan now!
+          setStep(3);
         } else {
           navigate("/feed");
         }
@@ -85,7 +81,6 @@ export default function Signup() {
     onError: () => setError("Google Signup Failed"),
   });
 
-  /* password strength */
   const pwdStrength = () => {
     const p = form.password;
     if (!p) return 0;
@@ -131,17 +126,13 @@ export default function Signup() {
         alumniPlan: overridePlan || form.alumniPlan,
       };
 
-      const res = await API.post("/auth/signup", payload);
+      const data = await signupUser(payload);
 
-      // ✅ STORE TOKEN
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userId", res.data.user._id);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userId", data.user._id);
+      login(data.user);
 
-      // ✅ update auth context
-      login(res.data.user);
-
-      // ✅ redirect
-      if (res.data.user.role === "student") navigate("/feed");
+      if (data.user.role === "student") navigate("/feed");
       else navigate("/alumni/dashboard/feed");
 
     } catch (err) {
@@ -184,7 +175,6 @@ export default function Signup() {
             <img src="/connect-logo.png" alt="Connect" style={{ height: 150, width: "auto", objectFit: "contain" }} />
           </div>
 
-          {/* Step indicator */}
           <div>
             <p style={{ fontSize: 12, color: "var(--text-3)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 20 }}>
               Step {step} of {form.role === "alumni" ? "3" : "2"}
@@ -356,7 +346,6 @@ export default function Signup() {
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {/* Name */}
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     Full Name
@@ -365,7 +354,6 @@ export default function Signup() {
                     onChange={e => set("name", e.target.value)} />
                 </div>
 
-                {/* Email */}
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     Email address
@@ -374,7 +362,6 @@ export default function Signup() {
                     onChange={e => set("email", e.target.value)} />
                 </div>
 
-                {/* College (student) / Company (alumni) */}
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     {form.role === "student" ? "College Name" : "Current Company"}
@@ -385,7 +372,6 @@ export default function Signup() {
                     onChange={e => set(form.role === "student" ? "college" : "company", e.target.value)} />
                 </div>
 
-                {/* Password */}
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     Password
@@ -401,7 +387,6 @@ export default function Signup() {
                       <EyeIcon open={showPwd} />
                     </button>
                   </div>
-                  {/* Strength bar */}
                   {form.password && (
                     <div style={{ marginTop: 8 }}>
                       <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
@@ -418,7 +403,6 @@ export default function Signup() {
                   )}
                 </div>
 
-                {/* Confirm password */}
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     Confirm Password
@@ -482,7 +466,6 @@ export default function Signup() {
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
-                {/* Simple */}
                 <div onClick={() => set("alumniPlan", "simple")} style={{
                   padding: "22px 24px", borderRadius: 16, cursor: "pointer",
                   border: `1.5px solid ${form.alumniPlan === "simple" ? "var(--teal)" : "var(--border)"}`,
@@ -515,7 +498,6 @@ export default function Signup() {
                   ))}
                 </div>
 
-                {/* Premium */}
                 <div onClick={() => set("alumniPlan", "premium")} style={{
                   padding: "22px 24px", borderRadius: 16, cursor: "pointer",
                   border: `1.5px solid ${form.alumniPlan === "premium" ? "var(--orange)" : "var(--border)"}`,
@@ -562,7 +544,6 @@ export default function Signup() {
                 </div>
               </div>
 
-              {/* 20% cut note */}
               <div style={{
                 padding: "12px 16px", borderRadius: 12, marginBottom: 20,
                 background: "rgba(124,92,252,0.07)", border: "1px solid rgba(124,92,252,0.2)",

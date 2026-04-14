@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniCard from "../../../components/networking/AlumniCard";
 import { useAuth } from "../../../context/AuthContext";
-
-import API from "../../../utils/api";
+import { getAlumni } from "../../../services/userService";
 
 const SearchIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -21,8 +20,8 @@ export default function Networking() {
   useEffect(() => {
     const fetchAlumni = async () => {
       try {
-        const res = await API.get("/users/alumni");
-        setAlumniList(res.data.alumni || []);
+        const data = await getAlumni();
+        setAlumniList(data.alumni || []);
       } catch (err) {
         console.error("Networking fetch error", err);
       } finally {

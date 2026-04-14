@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import { CourseCard } from "../../../components/academics/CourseCard";
 import { SessionCard } from "../../../components/academics/CourseCard";
-import API from "../../../utils/api";
-import { useEffect } from "react";
+import { getCourses, getSessions } from "../../../services/courseService";
 
 const TABS = ["All", "Courses", "Live Sessions", "Workshops"];
 
@@ -15,25 +14,25 @@ export default function Academics() {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
-        const [coursesRes, sessionsRes] = await Promise.all([
-          API.get("/courses"),
-          API.get("/sessions")
+        const [coursesData, sessionsData] = await Promise.all([
+          getCourses(),
+          getSessions()
         ]);
         
-        const mappedCourses = (coursesRes.data.courses || []).map(c => ({
+        const mappedCourses = (coursesData.courses || []).map(c => ({
           id: c._id,
           title: c.title,
           thumbnail: c.thumbnail,
           instructor: { name: c.instructor?.name || "Instructor", company: c.instructor?.company || "Connect Alumni" },
           rating: c.rating?.average || 4.5,
           reviews: c.rating?.count || 12,
-          modules: 10, // Mocked for UI visualization
+          modules: 10,
           enrolled: c.enrolledStudents?.length || 0,
           price: c.price,
           originalPrice: c.originalPrice || undefined
         }));
 
-        const mappedSessions = (sessionsRes.data.sessions || []).map(s => ({
+        const mappedSessions = (sessionsData.sessions || []).map(s => ({
           id: s._id,
           title: s.title,
           type: s.type || "Live Session",
