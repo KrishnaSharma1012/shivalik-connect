@@ -16,6 +16,7 @@ const StarIcon = () => (
 
 import API from "../../../utils/api";
 import { useLocation } from "react-router-dom";
+import { DUMMY_CONVERSATIONS, DUMMY_MESSAGES } from "../../../utils/mockData";
 
 /* ── Conversation Item ── */
 function ConversationItem({ chat, active, onClick }) {
@@ -74,7 +75,8 @@ export default function AlumniMessages() {
   const fetchConversations = async () => {
     try {
       const res = await API.get("/messages/conversations");
-      const formatted = res.data.conversations.map(c => ({
+      const fetched = res.data.conversations || [];
+      const formatted = fetched.map(c => ({
         id: c.partner?._id,
         name: c.partner?.name,
         company: c.partner?.company || c.partner?.role,
@@ -83,24 +85,32 @@ export default function AlumniMessages() {
         unread: c.unread,
         avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
         color: "#7C5CFC",
-        // Dummy logic to assume true if they enrolled or subscribed. 
-        // We'll mark as true so alumni can talk to them if they are an active student.
         subscribed: c.partner?.role === "student"
       })).filter(c => c.id);
       
-      setConversations(formatted);
+      if (formatted.length > 0) {
+        setConversations(formatted);
+      } else {
+        setConversations(DUMMY_CONVERSATIONS);
+      }
       
       const searchParams = new URLSearchParams(location.search);
       const userParam = searchParams.get("user");
       
+      const currentList = formatted.length > 0 ? formatted : DUMMY_CONVERSATIONS;
+
       if (userParam) {
-        const existing = formatted.find(c => c.id === userParam);
+        const existing = currentList.find(c => c.id === userParam);
         if (existing) setActiveChat(existing);
         else setActiveChat({ id: userParam, name: "New Conversation", company: "Start chatting...", avatar: "N", color: "#7C5CFC", subscribed: true });
-      } else if (formatted.length > 0 && !activeChat) {
-        setActiveChat(formatted[0]);
+      } else if (currentList.length > 0 && !activeChat) {
+        setActiveChat(currentList[0]);
       }
-    } catch(err) { console.error(err); }
+    } catch(err) { 
+       console.error(err);
+       setConversations(DUMMY_CONVERSATIONS);
+       if (!activeChat && DUMMY_CONVERSATIONS.length > 0) setActiveChat(DUMMY_CONVERSATIONS[0]);
+    }
   };
 
   useEffect(() => {
@@ -110,13 +120,21 @@ export default function AlumniMessages() {
   const fetchMessages = async (userId) => {
     try {
       const res = await API.get(`/messages/${userId}`);
-      const formatted = res.data.messages.map(m => ({
-         sender: m.sender._id === userId ? "them" : "me",
-         text: m.content,
-         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
-      }));
-      setMessages(formatted);
-    } catch(err) { console.error(err); }
+      const fetched = res.data.messages || [];
+      if (fetched.length > 0) {
+        const formatted = fetched.map(m => ({
+          sender: m.sender._id === userId ? "them" : "me",
+          text: m.content,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
+        }));
+        setMessages(formatted);
+      } else {
+        setMessages(DUMMY_MESSAGES);
+      }
+    } catch(err) { 
+      console.error(err);
+      setMessages(DUMMY_MESSAGES);
+    }
   };
 
   useEffect(() => {

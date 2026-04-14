@@ -3,6 +3,7 @@ import MainLayout from "../../../components/layout/MainLayout";
 import AlumniModelGate from "../../../components/common/AlumniModelGate";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
+import { DUMMY_EARNINGS } from "../../../utils/mockData";
 
 
 const typeColors = {
@@ -21,23 +22,30 @@ export default function Earnings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isPremium) return;
+    // If not premium, we still show dummy data for preview
     const fetchData = async () => {
       try {
         const [earningsRes, statsRes] = await Promise.all([
           API.get("/earnings"),
           API.get("/earnings/stats")
         ]);
-        setTransactions(earningsRes.data.earnings || []);
-        setStats(statsRes.data);
+        const fetchedTxs = earningsRes.data.earnings || [];
+        if (fetchedTxs.length > 0) {
+          setTransactions(fetchedTxs);
+          setStats(statsRes.data);
+        } else {
+          setTransactions(DUMMY_EARNINGS);
+        }
       } catch (err) {
         console.error("Earnings fetch error", err);
+        setTransactions(DUMMY_EARNINGS);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, [isPremium]);
+
 
   const totalEarnings = stats?.totalGross || transactions.reduce((s, t) => s + (t.netAmount || 0), 0);
   const thisMonth = stats?.thisMonth || 0;

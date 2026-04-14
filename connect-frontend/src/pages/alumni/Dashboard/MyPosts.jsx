@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import API from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
+import { DUMMY_MY_POSTS } from "../../../utils/mockData";
 
 /* ── Icons ── */
 const HeartIcon = ({ filled }) => (
@@ -278,9 +279,15 @@ export default function MyPosts() {
   const fetchPosts = async () => {
     try {
       const res = await API.get("/posts/my");
-      setPosts(res.data.posts || []);
+      const fetchedPosts = res.data.posts || [];
+      if (fetchedPosts.length > 0) {
+        setPosts(fetchedPosts);
+      } else {
+        setPosts(DUMMY_MY_POSTS);
+      }
     } catch (err) {
       console.error(err);
+      setPosts(DUMMY_MY_POSTS);
     } finally {
       setLoading(false);
     }

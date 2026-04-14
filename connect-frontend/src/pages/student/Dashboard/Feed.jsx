@@ -4,32 +4,7 @@ import MainLayout from "../../../components/layout/MainLayout";
 import PostCard from "../../../components/feed/PostCard";
 import { getPosts } from "../../../services/feedService";
 
-const DUMMY_POSTS = [
-  {
-    _id: "p1",
-    author: { _id: "u1", name: "Rahul Sharma", role: "alumni", isVerified: true, company: "Google" },
-    content: "Just published a new guide on cracking System Design interviews! Check it out.",
-    likes: ["u2", "u3", "u4"],
-    comments: [{ _id: "c1", author: { name: "Arjun" }, content: "Thanks for sharing!" }],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    _id: "p2",
-    author: { _id: "u2", name: "Priya Nair", role: "alumni", isVerified: true, company: "Meta" },
-    content: "Anyone looking for a mock interview this weekend? I have 2 slots available.",
-    likes: ["u1", "u4", "u5", "u6", "u7", "u8"], // Trending
-    comments: [],
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    _id: "p3",
-    author: { _id: "u3", name: "Amit Patel", role: "student", isVerified: false, college: "IIT Bombay" },
-    content: "Just started learning React, any good resources you alumni recommend?",
-    likes: ["u1", "u2"],
-    comments: [],
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-  }
-];
+import { DUMMY_POSTS } from "../../../utils/mockData";
 
 const FilterTabs = ["All", "Connected", "Trending", "Current Activity"];
 

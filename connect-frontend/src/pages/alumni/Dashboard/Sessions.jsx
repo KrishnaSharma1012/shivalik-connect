@@ -9,6 +9,7 @@ import {
   isItemLive
 } from "../../../utils/academicCatalog";
 import API from "../../../utils/api";
+import { DUMMY_MY_SESSIONS } from "../../../utils/mockData";
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -897,15 +898,23 @@ export default function Sessions() {
         totalSeats: s.totalSeats || 50, enrolled: s.enrolledStudents?.length || 0,
         isLive: s.isLive || false, thumbnail: s.thumbnail || ""
       }));
-      setSessions([...myCourses, ...mySessions]);
+      
+      const allItems = [...myCourses, ...mySessions];
+      if (allItems.length > 0) {
+        setSessions(allItems);
+      } else {
+        setSessions(DUMMY_MY_SESSIONS);
+      }
     } catch(err) {
       console.error(err);
+      setSessions(DUMMY_MY_SESSIONS);
     }
   };
 
   useEffect(() => {
     fetchItems();
   }, []);
+
 
   const addItem = async (payload, targetType) => {
     try {
