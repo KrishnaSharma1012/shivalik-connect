@@ -316,4 +316,4 @@ const backBtnStyle = {
   borderRadius: 10, padding: "11px 18px",
   fontSize: 14, color: "var(--text-2)",
   cursor: "pointer", fontFamily: "DM Sans",
-};s
+};

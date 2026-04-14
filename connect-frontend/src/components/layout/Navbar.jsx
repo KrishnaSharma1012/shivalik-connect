@@ -69,7 +69,7 @@ export default function Navbar() {
   const userRef  = useRef();
   const searchRef = useRef();
 
-  const searchItems = SEARCH_INDEX.filter(item => item.roles.includes(user?.role || "student"));
+  // const searchItems = SEARCH_INDEX.filter(item => item.roles.includes(user?.role || "student"));
   const searchResults = search
     ? searchItems
         .filter(item => {
