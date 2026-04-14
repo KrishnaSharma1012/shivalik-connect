@@ -2,13 +2,59 @@ import React, { useState } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import { CourseCard } from "../../../components/academics/CourseCard";
 import { SessionCard } from "../../../components/academics/CourseCard";
-import { getStudentCatalog } from "../../../utils/academicCatalog";
+import API from "../../../utils/api";
+import { useEffect } from "react";
 
 const TABS = ["All", "Courses", "Live Sessions", "Workshops"];
 
 export default function Academics() {
   const [activeTab, setActiveTab] = useState("All");
-  const { courses: COURSES, sessions: SESSIONS } = getStudentCatalog();
+  const [COURSES, setCourses] = useState([]);
+  const [SESSIONS, setSessions] = useState([]);
+
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const [coursesRes, sessionsRes] = await Promise.all([
+          API.get("/courses"),
+          API.get("/sessions")
+        ]);
+        
+        const mappedCourses = (coursesRes.data.courses || []).map(c => ({
+          id: c._id,
+          title: c.title,
+          thumbnail: c.thumbnail,
+          instructor: { name: c.instructor?.name || "Instructor", company: c.instructor?.company || "Connect Alumni" },
+          rating: c.rating?.average || 4.5,
+          reviews: c.rating?.count || 12,
+          modules: 10, // Mocked for UI visualization
+          enrolled: c.enrolledStudents?.length || 0,
+          price: c.price,
+          originalPrice: c.originalPrice || undefined
+        }));
+
+        const mappedSessions = (sessionsRes.data.sessions || []).map(s => ({
+          id: s._id,
+          title: s.title,
+          type: s.type || "Live Session",
+          thumbnail: s.thumbnail,
+          instructor: { name: s.instructor?.name || "Instructor", company: s.instructor?.company || "Connect Alumni" },
+          date: new Date(s.date || Date.now()).toLocaleDateString(),
+          time: s.time || "6:00 PM IST",
+          duration: s.duration || "1 hour",
+          enrolled: s.enrolledStudents?.length || 0,
+          price: s.price,
+          status: s.status || "upcoming"
+        }));
+
+        setCourses(mappedCourses);
+        setSessions(mappedSessions);
+      } catch (err) {
+        console.error("Academics fetch error", err);
+      }
+    };
+    fetchCatalog();
+  }, []);
 
   const showCourses   = activeTab === "All" || activeTab === "Courses";
   const showSessions  = activeTab === "All" || activeTab === "Live Sessions" || activeTab === "Workshops";

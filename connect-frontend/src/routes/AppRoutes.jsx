@@ -38,6 +38,9 @@ import SessionsAdmin from "../pages/admin/Sessions";
 import Analytics from "../pages/admin/Analytics";
 import AdminProfile from "../pages/admin/Profile";
 
+// Live Class
+import LiveClass from "../pages/common/LiveClass";
+
 // 404
 import NotFound from "../pages/NotFound";
 
@@ -227,6 +230,16 @@ function AppRoutes() {
       <Route path="/admin/sessions" element={<ProtectedRoute><SessionsAdmin /></ProtectedRoute>} />
       <Route path="/admin/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
       <Route path="/admin/profile" element={<ProtectedRoute><AdminProfile /></ProtectedRoute>} />
+
+      {/* Live Class */}
+      <Route
+        path="/live/:id"
+        element={
+          <ProtectedRoute>
+            <LiveClass />
+          </ProtectedRoute>
+        }
+      />
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

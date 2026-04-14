@@ -1,4 +1,5 @@
 import courseThumbnail from "../assets/hero.png";
+import API from "./api";
 
 export const DEFAULT_COURSES = [
   {
@@ -212,21 +213,20 @@ export function getAcademicItemKey(item) {
   return `${type}:${item.id ?? item.title}`;
 }
 
-export function enrollAcademicItem(item) {
-  if (!item) return [];
-  const current = getEnrollmentStore();
-  const key = getAcademicItemKey(item);
-  const normalizedItem = {
-    ...item,
-    type: item.type || "course",
-    thumbnailRatio: item.thumbnailRatio || "16 / 9",
-    thumbnailFit: item.thumbnailFit || "contain",
-  };
-  const next = current.some(entry => entry.key === key)
-    ? current.map(entry => (entry.key === key ? { ...entry, ...normalizedItem, key } : entry))
-    : [{ ...normalizedItem, key, enrolledAt: new Date().toISOString() }, ...current];
-  setEnrollmentStore(next);
-  return next;
+export async function enrollAcademicItem(item, paymentDetails = {}) {
+  if (!item) return;
+  const type = item.type === "course" ? "courses" : "sessions";
+  try {
+    const res = await API.post(`/${type}/${item.id}/enroll`, {
+      paymentMethod: paymentDetails.method || "upi",
+      amountPaid: item.price,
+      paymentId: paymentDetails.id || `PAY-${Math.random().toString(16).slice(2).toUpperCase()}`
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Enrollment failed", err);
+    throw err;
+  }
 }
 
 export function getEnrolledAcademicItems() {

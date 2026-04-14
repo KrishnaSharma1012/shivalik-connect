@@ -75,17 +75,50 @@ function CertificateBadge({ title, issuer, date }) {
 
 export default function PostCard({ post, onOpenProfile }) {
   const [liked, setLiked] = useState(false);
-  const [likes, setLikes] = useState(post.likes || 0);
+  const initialLikes = Array.isArray(post.likes) ? post.likes.length : (post.likes || 0);
+  const [likes, setLikes] = useState(initialLikes);
   const [showComment, setShowComment] = useState(false);
   const [comment, setComment] = useState("");
-  const [comments, setComments] = useState([]);
+  const [comments, setComments] = useState(Array.isArray(post.comments) ? post.comments : []);
   const [mediaIndex, setMediaIndex] = useState(0);
 
-  const handleLike = () => { setLikes(l => liked ? l - 1 : l + 1); setLiked(!liked); };
-  const handleComment = () => {
+  const authorObj = typeof post.author === "object" ? post.author : null;
+  const authorName = authorObj?.name || post.author || "Unknown";
+  const authorAvatarStr = authorObj?.avatar || post.authorAvatar || null;
+  const displayRole = authorObj?.role || post.role;
+  
+  let displayTime = post.time || "";
+  if (!displayTime && post.createdAt) {
+    const d = new Date(post.createdAt);
+    displayTime = isNaN(d.getTime()) ? "" : d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const handleLike = async () => {
+    // Optimistic update
+    setLiked(prev => !prev);
+    setLikes(l => liked ? l - 1 : l + 1);
+    if (post._id) {
+      try {
+        const res = await import("../../utils/api").then(m => m.default.post(`/posts/${post._id}/like`));
+        setLiked(res.data.liked);
+        setLikes(res.data.likesCount);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const handleComment = async () => {
     if (!comment.trim()) return;
-    setComments(prev => [...prev, { text: comment, time: "Just now" }]);
+    const textToSend = comment;
     setComment("");
+    if (post._id) {
+      try {
+        const res = await import("../../utils/api").then(m => m.default.post(`/posts/${post._id}/comment`, { content: textToSend }));
+        setComments(prev => [...prev, res.data.comment]);
+        return;
+      } catch (err) { console.error(err); }
+    }
+    // Fallback for dummy posts
+    setComments(prev => [...prev, { content: textToSend, time: "Just now" }]);
   };
 
   const slides = post.media?.filter(m => m.type === "image" || m.type === "video") || [];
@@ -134,20 +167,20 @@ export default function PostCard({ post, onOpenProfile }) {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-          background: post.authorAvatar ? `url(${post.authorAvatar}) center/cover no-repeat` : "linear-gradient(135deg, #7C5CFC, #FF7043)",
+          background: authorAvatarStr ? `url(${authorAvatarStr}) center/cover no-repeat` : "linear-gradient(135deg, #7C5CFC, #FF7043)",
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "white", fontWeight: 700, fontSize: 16, fontFamily: "Plus Jakarta Sans",
           overflow: "hidden",
         }}>
-          {!post.authorAvatar && (post.author || "?")[0].toUpperCase()}
+          {!authorAvatarStr && authorName.charAt(0).toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.author}</span>
+            <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{authorName}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-            <p style={{ fontSize: 12, color: "var(--text-3)" }}>{post.time}</p>
-            {post.role && <p style={{ fontSize: 11, color: "var(--text-3)" }}>· {post.role}</p>}
+            <p style={{ fontSize: 12, color: "var(--text-3)" }}>{displayTime}</p>
+            {displayRole && <p style={{ fontSize: 11, color: "var(--text-3)" }}>· {displayRole}</p>}
             {post.visibility && post.visibility !== "everyone" && (
               <span style={{ fontSize: 11, color: "var(--text-3)" }}>· {post.visibility === "connections" ? "🤝 Connections" : "🎓 Students"}</span>
             )}
@@ -351,20 +384,25 @@ export default function PostCard({ post, onOpenProfile }) {
       {/* Comments */}
       {showComment && (
         <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-          {comments.map((c, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                background: "linear-gradient(135deg, #7C5CFC40, #FF704340)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--purple-light)", fontSize: 12, fontWeight: 700,
-              }}>Y</div>
-              <div style={{ background: "var(--bg-4)", borderRadius: 10, padding: "8px 12px", flex: 1 }}>
-                <p style={{ fontSize: 13, color: "var(--text-2)" }}>{c.text}</p>
-                <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{c.time}</p>
+          {comments.map((c, i) => {
+            const commenterName = c.author?.name || c.author || "User";
+            const initial = commenterName.charAt(0).toUpperCase();
+            return (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: "linear-gradient(135deg, #7C5CFC40, #FF704340)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--purple-light)", fontSize: 12, fontWeight: 700,
+                }}>{initial}</div>
+                <div style={{ background: "var(--bg-4)", borderRadius: 10, padding: "8px 12px", flex: 1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{commenterName}</p>
+                  <p style={{ fontSize: 13, color: "var(--text-2)" }}>{c.content || c.text}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{c.time || c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "Just now"}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <input value={comment} onChange={e => setComment(e.target.value)} onKeyDown={e => e.key === "Enter" && handleComment()}
               placeholder="Write a comment…" style={{

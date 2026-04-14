@@ -6,89 +6,37 @@ import PostCard from "../../../components/feed/PostCard";
 import CrownIcon from "../../../components/common/CrownIcon";
 import PaymentModal from "../../../components/academics/PaymentModal";
 import { useAuth } from "../../../context/AuthContext";
+import API from "../../../utils/api";
 
-const INITIAL_POSTS = [
-  {
-    id: 1,
-    author: "Rahul Sharma",
-    role: "SWE @ Google",
-    content: "Excited to host a System Design session this weekend! 200+ students joined my last one 🚀\n\nThis time covering Netflix, Uber, WhatsApp architectures — register via the Academics tab.\n\n🗓 Saturday 11 AM IST | 🎓 All levels welcome",
-    time: "2h ago",
-    likes: 94,
-    verified: true,
-    has24h: true,
-    isPremium: true,
-    media: [
-      { type: "image", url: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&q=80", name: "session.jpg" },
-      { type: "image", url: "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=400&q=80", name: "students.jpg" },
-    ],
-  },
-  {
-    id: 2,
-    author: "Priya Nair",
-    role: "Data Scientist @ Microsoft",
-    content: "Thrilled to announce I just completed the Google Cloud Professional Data Engineer certification! This one was a journey 🙏\n\nIf you're in data and want to know the best path to cloud certs, happy to chat!",
-    time: "Yesterday",
-    likes: 142,
-    verified: true,
-    postType: "certificate",
-    certificate: {
-      title: "Professional Data Engineer – Google Cloud",
-      issuer: "Google Cloud",
-      date: "March 2025",
-    },
-  },
-  {
-    id: 3,
-    author: "Ananya Verma",
-    role: "PM @ Amazon",
-    content: "React tip of the day: Stop using useEffect for derived state.\n\nIf you can compute something from existing state/props, just compute it directly in render. Saves performance + mental overhead.\n\nFull post →",
-    time: "Yesterday",
-    likes: 231,
-    verified: true,
-    linkUrl: "https://dev.to",
-  },
-  {
-    id: 4,
-    author: "Sneha Joshi",
-    role: "UX Lead @ Flipkart",
-    content: "Design Thinking for Engineers — FREE workshop this Saturday!\n\nAfter 3 sold-out sessions, I'm back with a bigger one. Register before Sunday midnight, seats filling fast 🎨",
-    time: "2 days ago",
-    likes: 176,
-    verified: true,
-    postType: "poster",
-    media: [
-      { type: "image", url: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=600&q=80", name: "workshop-poster.jpg" },
-    ],
-  },
-  {
-    id: 5,
-    author: "Karan Mehta",
-    role: "FAANG SWE",
-    content: "Just earned my third AWS certification — Solutions Architect Professional 💪\n\nTook 3 attempts. Here's what worked on attempt 3: focus on scenarios, not memorization. Happy to share my notes!",
-    time: "3 days ago",
-    likes: 289,
-    verified: true,
-    postType: "certificate",
-    certificate: {
-      title: "AWS Solutions Architect – Professional",
-      issuer: "Amazon Web Services",
-      date: "April 2025",
-    },
-    media: [
-      { type: "image", url: "https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=600&q=80", name: "aws-badge.jpg" },
-    ],
-  },
-];
 
 export default function AlumniFeed() {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const isPremium = user?.alumniPlan === "premium";
-  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [posts, setPosts] = React.useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  const addPost = (newPost) => setPosts([{ ...newPost, verified: true, isPremium: true }, ...posts]);
+  React.useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      const res = await API.get("/posts");
+      setPosts(res.data.posts || []);
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
+  const addPost = async (newPost) => {
+    try {
+      const res = await API.post("/posts", { content: newPost.content });
+      fetchPosts();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleGoPremium = () => {
     setShowPaymentModal(true);

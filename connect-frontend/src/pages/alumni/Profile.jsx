@@ -1,42 +1,91 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "../../components/layout/MainLayout";
 import ProfileCard from "../../components/profile/ProfileCard";
 import EditProfile from "../../components/profile/EditProfile";
 import Stats from "../../components/profile/Stats";
 import Modal from "../../components/common/Modal";
 import PostCard from "../../components/feed/PostCard";
-import { getPostsByAlumniName } from "../../utils/alumniData";
+import API from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
 function AlumniProfile() {
+  const { user, updateUser } = useAuth();
   const [open, setOpen] = useState(false);
-  const [avatar, setAvatar] = useState(null);
-  const [coverPhoto, setCoverPhoto] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [stats, setStats] = useState([
+    { label: "Sessions Taken", value: 0 },
+    { label: "Students Mentored", value: 0 },
+    { label: "Courses", value: 0 },
+    { label: "Earnings", value: "₹0" },
+  ]);
+  const [loading, setLoading] = useState(true);
 
-  const [user, setUser] = useState({
-    name: "Rahul Sharma",
-    role: "Software Engineer @ Google",
-    college: "IIT Delhi",
-    about: "Helping students crack top tech companies. 5+ years of experience.",
-    skills: ["DSA", "System Design", "React"],
-  });
+  useEffect(() => {
+    if (!user) return;
 
-  const handleAvatarChange = (url) => setAvatar(url);
-  const handleCoverChange = (url) => setCoverPhoto(url);
+    const fetchData = async () => {
+      try {
+        const [postsRes, earningsRes, sessionsRes, coursesRes] = await Promise.all([
+          API.get("/posts/my"),
+          API.get("/earnings/stats"),
+          API.get("/sessions/my"),
+          API.get("/courses/my"),
+        ]);
 
-  const stats = [
-    { label: "Sessions Taken", value: 45 },
-    { label: "Students Mentored", value: 200 },
-    { label: "Courses", value: 6 },
-    { label: "Earnings", value: "₹60K" },
-  ];
+        setPosts(postsRes.data.posts || []);
 
-  const alumniPosts = getPostsByAlumniName(user.name);
+        const statsData = earningsRes.data;
+        setStats([
+          { label: "Sessions Taken", value: sessionsRes.data.sessions?.length || 0 },
+          { label: "Students Mentored", value: statsData?.totalTransactions || 0 },
+          { label: "Courses", value: coursesRes.data.courses?.length || 0 },
+          { label: "Earnings", value: `₹${(statsData?.totalGross || 0).toLocaleString()}` },
+        ]);
+      } catch (err) {
+        console.error("Error fetching profile data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const handleAvatarChange = async (url) => {
+    try {
+      const res = await API.put("/users/profile", { avatar: url });
+      updateUser(res.data.user);
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+    }
+  };
+
+  const handleCoverChange = async (url) => {
+    try {
+      const res = await API.put("/users/profile", { coverPhoto: url });
+      updateUser(res.data.user);
+    } catch (err) {
+      console.error("Cover photo upload failed:", err);
+    }
+  };
+
+  const handleSaveProfile = async (updated) => {
+    try {
+      const res = await API.put("/users/profile", updated);
+      updateUser(res.data.user);
+      setOpen(false);
+    } catch (err) {
+      console.error("Profile update failed:", err);
+    }
+  };
+
+  if (!user) return null;
 
   return (
     <MainLayout>
       <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 720, margin: "0 auto", padding: "24px 0" }}>
         <ProfileCard
-          user={{ ...user, avatar, coverPhoto }}
+          user={user}
           onEdit={() => setOpen(true)}
           onAvatarChange={handleAvatarChange}
           onCoverChange={handleCoverChange}
@@ -51,13 +100,15 @@ function AlumniProfile() {
             My Posts
           </h2>
 
-          {alumniPosts.length === 0 ? (
+          {loading ? (
+            <p style={{ color: "var(--text-3)", textAlign: "center" }}>Loading posts...</p>
+          ) : posts.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px 20px", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 14 }}>
-              <p style={{ fontSize: 14, color: "var(--text-3)", margin: 0 }}>No posts found for this alumni profile yet.</p>
+              <p style={{ fontSize: 14, color: "var(--text-3)", margin: 0 }}>No posts found for your profile yet.</p>
             </div>
           ) : (
-            alumniPosts.map((post) => (
-              <PostCard key={post.id} post={post} />
+            posts.map((post) => (
+              <PostCard key={post._id} post={post} />
             ))
           )}
         </div>
@@ -70,10 +121,7 @@ function AlumniProfile() {
         >
           <EditProfile
             user={user}
-            onSave={(updated) => {
-              setUser(updated);
-              setOpen(false);
-            }}
+            onSave={handleSaveProfile}
           />
         </Modal>
 

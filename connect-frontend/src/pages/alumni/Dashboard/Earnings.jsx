@@ -1,23 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniModelGate from "../../../components/common/AlumniModelGate";
 import { useAuth } from "../../../context/AuthContext";
-
-// IS_PREMIUM is now derived from real user data, not a hardcoded constant
-
-const STATS = [
-  { label: "Total Earnings", value: "₹45,000", icon: "💰", trend: "+12%", color: "var(--teal)" },
-  { label: "This Month",     value: "₹8,500",  icon: "📈", trend: "+23%", color: "var(--purple-light)" },
-  { label: "Sessions Taken", value: "32",       icon: "🎥", trend: "+3",   color: "var(--orange)" },
-];
-
-const TRANSACTIONS = [
-  { id: 1, title: "System Design Session",      amount: 999,  date: "12 Apr 2026", students: 8,  type: "session"  },
-  { id: 2, title: "React Workshop",             amount: 1499, date: "10 Apr 2026", students: 14, type: "workshop" },
-  { id: 3, title: "FAANG Prep Course — Week 1", amount: 3200, date: "5 Apr 2026",  students: 28, type: "course"   },
-  { id: 4, title: "1:1 Mentorship Call",        amount: 499,  date: "3 Apr 2026",  students: 1,  type: "mentorship" },
-  { id: 5, title: "DSA Bootcamp Session",       amount: 1200, date: "28 Mar 2026", students: 11, type: "session"  },
-];
+import API from "../../../utils/api";
 
 
 const typeColors = {
@@ -31,6 +16,38 @@ export default function Earnings() {
   const { user } = useAuth();
   const isPremium = user?.alumniPlan === "premium";
   const [tab, setTab] = useState("Earnings");
+  const [transactions, setTransactions] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isPremium) return;
+    const fetchData = async () => {
+      try {
+        const [earningsRes, statsRes] = await Promise.all([
+          API.get("/earnings"),
+          API.get("/earnings/stats")
+        ]);
+        setTransactions(earningsRes.data.earnings || []);
+        setStats(statsRes.data);
+      } catch (err) {
+        console.error("Earnings fetch error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [isPremium]);
+
+  const totalEarnings = stats?.totalGross || transactions.reduce((s, t) => s + (t.netAmount || 0), 0);
+  const thisMonth = stats?.thisMonth || 0;
+  const sessionCount = stats?.sessionCount || transactions.length;
+
+  const STATS = [
+    { label: "Total Earnings", value: `₹${totalEarnings.toLocaleString()}`, icon: "💰", trend: "+12%", color: "var(--teal)" },
+    { label: "This Month",     value: `₹${thisMonth.toLocaleString()}`,     icon: "📈", trend: "+23%", color: "var(--purple-light)" },
+    { label: "Sessions Taken", value: String(sessionCount),                  icon: "🎥", trend: "+3",   color: "var(--orange)" },
+  ];
 
   return (
     <MainLayout>
@@ -118,14 +135,31 @@ export default function Earnings() {
               </span>
             </div>
 
-            {TRANSACTIONS.map((tx, i) => {
-              const tc = typeColors[tx.type];
-              const yourShare = Math.round(tx.amount * 0.8);
+            {loading && (
+              <div style={{ padding: "32px", textAlign: "center", color: "var(--text-3)", fontSize: 14 }}>
+                Loading transactions…
+              </div>
+            )}
+
+            {!loading && transactions.length === 0 && (
+              <div style={{ padding: "40px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>💸</div>
+                <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>No transactions yet</p>
+                <p style={{ fontSize: 13, color: "var(--text-3)" }}>Earnings appear here when students enroll in your sessions or courses.</p>
+              </div>
+            )}
+
+            {!loading && transactions.map((tx, i) => {
+              const txType = tx.type || (tx.sourceModel === "Course" ? "course" : "session");
+              const tc = typeColors[txType] || typeColors.session;
+              const grossAmt = tx.grossAmount || 0;
+              const yourShare = tx.alumniShare || Math.round(grossAmt * 0.8);
+              const txDate = tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
               return (
-                <div key={tx.id} style={{
+                <div key={tx._id} style={{
                   display: "flex", alignItems: "center", gap: 14,
                   padding: "14px 20px",
-                  borderBottom: i < TRANSACTIONS.length - 1 ? "1px solid var(--border)" : "none",
+                  borderBottom: i < transactions.length - 1 ? "1px solid var(--border)" : "none",
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
@@ -137,18 +171,25 @@ export default function Earnings() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     color: tc.color, fontSize: 16, flexShrink: 0,
                   }}>
-                    {tx.type === "session" ? "🎥" : tx.type === "workshop" ? "🛠" : tx.type === "course" ? "📚" : "🎯"}
+                    {txType === "session" ? "🎥" : txType === "workshop" ? "🛠" : txType === "course" ? "📚" : "🎯"}
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 3 }}>{tx.title}</p>
+                    <p style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 3 }}>
+                      {tx.sourceTitle || "Untitled"}
+                    </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 11, color: "var(--text-3)" }}>📅 {tx.date}</span>
-                      <span style={{ fontSize: 11, color: "var(--text-3)" }}>· 👥 {tx.students} students</span>
+                      <span style={{ fontSize: 11, color: "var(--text-3)" }}>📅 {txDate}</span>
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 99,
                         background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color,
+                        textTransform: "capitalize",
                       }}>{tc.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 99,
+                        background: tx.status === "paid" ? "rgba(0,229,195,0.1)" : "rgba(255,200,0,0.1)",
+                        color: tx.status === "paid" ? "var(--teal)" : "#F5C842",
+                        border: `1px solid ${tx.status === "paid" ? "rgba(0,229,195,0.25)" : "rgba(245,200,66,0.25)"}`,
+                      }}>{tx.status || "pending"}</span>
                     </div>
                   </div>
 
@@ -156,7 +197,7 @@ export default function Earnings() {
                     <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--teal)" }}>
                       +₹{yourShare.toLocaleString()}
                     </p>
-                    <p style={{ fontSize: 11, color: "var(--text-3)" }}>of ₹{tx.amount}</p>
+                    <p style={{ fontSize: 11, color: "var(--text-3)" }}>of ₹{grossAmt.toLocaleString()}</p>
                   </div>
                 </div>
               );

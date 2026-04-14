@@ -1,8 +1,8 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
 import courseThumbnail from "../../assets/hero.png";
-import { getEnrolledAcademicItems } from "../../utils/academicCatalog";
+import API from "../../utils/api";
 
 const sectionStyle = {
   background: "var(--bg-3)",
@@ -21,7 +21,22 @@ const titleStyle = {
 
 export default function MyLearning() {
   const navigate = useNavigate();
-  const items = getEnrolledAcademicItems();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEnrollments = async () => {
+      try {
+        const res = await API.get("/users/me/enrolled");
+        setItems(res.data.enrollments || []);
+      } catch (err) {
+        console.error("Fetch enrollments error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEnrollments();
+  }, []);
 
   const courses = items.filter(item => (item.type || "course") === "course");
   const sessions = items.filter(item => item.type === "session");
@@ -39,7 +54,11 @@ export default function MyLearning() {
           </p>
         </div>
 
-        {items.length === 0 ? (
+        {loading ? (
+          <div style={sectionStyle}>
+            <p style={{ color: "var(--text-3)", textAlign: "center", padding: "40px 0" }}>Loading your enrollments...</p>
+          </div>
+        ) : items.length === 0 ? (
           <div style={sectionStyle}>
             <h2 style={titleStyle}>No enrollments yet</h2>
             <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 16 }}>

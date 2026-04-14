@@ -171,15 +171,41 @@ export default function SessionWorkshopDetails() {
                   <span style={{ fontSize: 12, color: "var(--text-3)", minWidth: 52 }}>{fillPct}% full</span>
                 </div>
 
-                <button onClick={() => setOpenPayment(true)} style={{
-                  padding: "12px 20px", borderRadius: 12,
-                  border: "none", background: "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
-                  color: "white", fontSize: 14, fontWeight: 700,
-                  fontFamily: "Plus Jakarta Sans", cursor: "pointer",
-                  boxShadow: "0 6px 22px rgba(124,92,252,0.35)",
-                }}>
-                  {isWorkshop ? "Register for Workshop →" : "Join Session →"}
-                </button>
+                {isEnrolled && (session.isLive || liveReady) ? (
+                  <button 
+                    onClick={() => navigate(`/live/${session._id || session.id}`, { state: { item: session } })}
+                    style={{
+                      padding: "12px 28px", borderRadius: 12,
+                      border: "none", background: "linear-gradient(135deg, #10B981, #059669)",
+                      color: "white", fontSize: 14, fontWeight: 700,
+                      fontFamily: "Plus Jakarta Sans", cursor: "pointer",
+                      boxShadow: "0 6px 22px rgba(16,185,129,0.35)",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "white", animation: "pulse 1.5s infinite" }} />
+                    Join Live Session Now →
+                  </button>
+                ) : isEnrolled ? (
+                  <button disabled style={{
+                    padding: "12px 24px", borderRadius: 12,
+                    border: "1px solid var(--border)", background: "var(--bg-4)",
+                    color: "var(--text-3)", fontSize: 14, fontWeight: 700,
+                    fontFamily: "Plus Jakarta Sans", cursor: "default",
+                  }}>
+                    Enrolled • Waiting for live
+                  </button>
+                ) : (
+                  <button onClick={() => setOpenPayment(true)} style={{
+                    padding: "12px 20px", borderRadius: 12,
+                    border: "none", background: "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
+                    color: "white", fontSize: 14, fontWeight: 700,
+                    fontFamily: "Plus Jakarta Sans", cursor: "pointer",
+                    boxShadow: "0 6px 22px rgba(124,92,252,0.35)",
+                  }}>
+                    {isWorkshop ? "Register for Workshop →" : "Join Session →"}
+                  </button>
+                )}
               </div>
 
               <div style={{

@@ -21,15 +21,27 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   if (!isOpen || !course) return null;
 
   const handlePayment = async () => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    if (!skipEnrollment) {
-      enrollAcademicItem(course);
+    try {
+      setLoading(true);
+      // Simulate payment gateway delay
+      await new Promise(r => setTimeout(r, 1200));
+
+      if (!skipEnrollment) {
+        await enrollAcademicItem(course, { method });
+      }
+      
+      onPaymentSuccess?.(course);
+      setSuccess(true);
+      setTimeout(() => { 
+        setSuccess(false); 
+        onClose(); 
+      }, 2000);
+    } catch (err) {
+      console.error("Payment modal enrollment error", err);
+      alert(err.response?.data?.message || "Enrollment failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    onPaymentSuccess?.(course);
-    setSuccess(true);
-    setTimeout(() => { setSuccess(false); onClose(); }, 2000);
   };
 
   const discount = course.originalPrice

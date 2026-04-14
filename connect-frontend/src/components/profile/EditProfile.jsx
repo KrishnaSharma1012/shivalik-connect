@@ -15,7 +15,8 @@ const labelStyle = {
 export default function EditProfile({ user = {}, onSave }) {
   const [form, setForm] = useState({
     name:    user.name    || "",
-    role:    user.role    || "",
+    title:   user.title   || "",
+    company: user.company || "",
     college: user.college || "",
     about:   user.about   || "",
     skills:  user.skills?.join(", ") || "",
@@ -32,7 +33,8 @@ export default function EditProfile({ user = {}, onSave }) {
 
   const fields = [
     { key: "name",    label: "Full Name",       placeholder: "e.g. Rahul Sharma"             },
-    { key: "role",    label: "Role / Position",  placeholder: "e.g. Software Engineer @ Google" },
+    { key: "title",   label: "Title / Position", placeholder: "e.g. Software Engineer" },
+    { key: "company", label: "Company",         placeholder: "e.g. Google" },
     { key: "college", label: "College",          placeholder: "e.g. IIT Delhi"                },
   ];
 

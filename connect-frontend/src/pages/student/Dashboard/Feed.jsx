@@ -69,8 +69,11 @@ export default function Feed() {
   // 🔥 FILTER LOGIC (adjusted for backend)
   const filteredPosts = posts.filter((p) => {
     if (activeTab === "All") return true;
-    if (activeTab === "Connected") return p.author?.isVerified;
-    if (activeTab === "Trending") return (p.likes?.length || 0) >= 5;
+    if (activeTab === "Connected") return p.author?.isVerified || p.author?.verified;
+    if (activeTab === "Trending") {
+      const likesCount = Array.isArray(p.likes) ? p.likes.length : (p.likes || 0);
+      return likesCount >= 5;
+    }
     if (activeTab === "Current Activity") return true;
     return true;
   });

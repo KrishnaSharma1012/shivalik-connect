@@ -68,16 +68,16 @@ const ViewProfileIcon = () => (
 );
 
 const getInstructorProfile = instructor => {
-  const match = instructor?.match(/^(.+?)\s*\((.+)\)$/);
-  const name = match?.[1]?.trim() || instructor || "Instructor";
-  const company = match?.[2]?.trim() || "";
+  const name = instructor?.name || "Instructor";
+  const company = instructor?.company || instructor?.title || "Verified Mentor";
 
   return {
+    _id: instructor?._id,
     name,
-    role: company ? `Course Instructor @ ${company}` : "Course Instructor",
+    role: company,
     verified: true,
-    college: company || "Verified Mentor",
-    isPremium: false,
+    college: company,
+    isPremium: true,
     has24h: false,
   };
 };
@@ -158,14 +158,14 @@ export default function CourseDetail() {
                 color: "white", fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 15,
               }}>{(course.instructor || "I")[0]}</div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{course.instructor}</p>
+                <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{course.instructor?.name || course.instructor}</p>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {course.rating && <span style={{ fontSize: 12, color: "#F5C842" }}>★ {course.rating}</span>}
                   {course.students && <span style={{ fontSize: 12, color: "var(--text-3)" }}>{course.students.toLocaleString()} students</span>}
                 </div>
               </div>
               <button
-                onClick={() => navigate("/alumni-profile", { state: { alumni: getInstructorProfile(course.instructor) } })}
+                onClick={() => navigate("/alumni-profile", { state: { alumniId: course.instructor?._id || course.instructor } })}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7,
                   padding: "9px 14px", borderRadius: 11,
@@ -289,9 +289,9 @@ export default function CourseDetail() {
               color: "white", fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22,
             }}>{(course.instructor || "I")[0]}</div>
             <div>
-              <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>{course.instructor}</p>
+              <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>{course.instructor?.name || course.instructor}</p>
               <button
-                onClick={() => navigate("/alumni-profile", { state: { alumni: getInstructorProfile(course.instructor) } })}
+                onClick={() => navigate("/alumni-profile", { state: { alumniId: course.instructor?._id || course.instructor } })}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7,
                   padding: "9px 14px", borderRadius: 11,

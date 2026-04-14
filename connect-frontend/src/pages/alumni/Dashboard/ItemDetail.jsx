@@ -141,13 +141,20 @@ export default function ItemDetail() {
     }
   };
 
-  const handleStartLive = () => {
+  const handleStartLive = async () => {
     if (!liveReady) return;
-    setCurrentItem(prev => {
-      const nextItem = { ...prev, isLive: true };
-      upsertAlumniItem(nextItem);
-      return nextItem;
-    });
+    try {
+      await API.patch(`/sessions/${currentItem._id || currentItem.id}/live`);
+      setCurrentItem(prev => ({ ...prev, isLive: true }));
+      navigate(`/live/${currentItem._id || currentItem.id}`, { state: { item: currentItem } });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to start live session");
+    }
+  };
+
+  const handleJoinLive = () => {
+    navigate(`/live/${currentItem._id || currentItem.id}`, { state: { item: currentItem } });
   };
 
   const tags = [type === "course" ? "Course" : isWorkshop ? "Workshop" : "Live Session"];
@@ -186,21 +193,20 @@ export default function ItemDetail() {
                   <button onClick={() => setEditing(true)} style={actionButtonStyle("linear-gradient(135deg, #7C5CFC, #9B7EFF)", "white")}><EditIcon /> Edit</button>
                   <button onClick={handleDelete} style={actionButtonStyle("rgba(255,75,110,0.12)", "var(--danger)", "1px solid rgba(255,75,110,0.25)")}><TrashIcon /> Delete</button>
                   {!isCourse && (
-                    <button
-                      onClick={handleStartLive}
-                      disabled={!liveReady || currentItem.isLive}
-                      style={{
-                        ...actionButtonStyle(
-                          currentItem.isLive ? "rgba(0,229,195,0.12)" : liveReady ? "linear-gradient(135deg, #00E5C3, #7C5CFC)" : "rgba(255,255,255,0.04)",
-                          currentItem.isLive ? "var(--teal)" : liveReady ? "white" : "var(--text-3)",
-                          liveReady && !currentItem.isLive ? "none" : "1px solid var(--border)",
-                        ),
-                        cursor: liveReady && !currentItem.isLive ? "pointer" : "not-allowed",
-                        opacity: liveReady || currentItem.isLive ? 1 : 0.6,
-                      }}
-                    >
-                      {currentItem.isLive ? "Live now" : liveReady ? "Start live session" : "Scheduled"}
-                    </button>
+                      <button
+                        onClick={currentItem.isLive ? handleJoinLive : handleStartLive}
+                        disabled={!liveReady && !currentItem.isLive}
+                        style={{
+                          ...actionButtonStyle(
+                            currentItem.isLive ? "rgba(0,229,195,0.12)" : liveReady ? "linear-gradient(135deg, #00E5C3, #7C5CFC)" : "rgba(255,255,255,0.04)",
+                            currentItem.isLive ? "var(--teal)" : liveReady ? "white" : "var(--text-3)",
+                            liveReady || currentItem.isLive ? "none" : "1px solid var(--border)",
+                          ),
+                          cursor: (liveReady || currentItem.isLive) ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {currentItem.isLive ? "Enter Live Room →" : liveReady ? "Start live session now →" : "Not yet scheduled"}
+                      </button>
                   )}
                 </div>
               </div>

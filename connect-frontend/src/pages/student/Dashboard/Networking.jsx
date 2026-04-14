@@ -1,16 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniCard from "../../../components/networking/AlumniCard";
 import { useAuth } from "../../../context/AuthContext";
 
-const ALL_ALUMNI = [
-  { id: 1, name: "Rahul Sharma",   role: "Software Engineer @ Google",    college: "IIT Delhi",   verified: true, isPremium: true, has24h: true  },
-  { id: 2, name: "Ananya Verma",   role: "Frontend Engineer @ Amazon",    college: "DTU",         verified: true, isPremium: false, has24h: false },
-  { id: 3, name: "Aman Gupta",     role: "Data Scientist @ Microsoft",    college: "NIT Trichy",  verified: true, isPremium: true, has24h: true  },
-  { id: 4, name: "Priya Nair",     role: "Product Manager @ Flipkart",    college: "IIT Bombay",  verified: true, isPremium: false, has24h: true  },
-  { id: 5, name: "Siddharth Jain", role: "ML Engineer @ Meta",            college: "BITS Pilani", verified: true, isPremium: true, has24h: false },
-  { id: 6, name: "Neha Singh",     role: "Backend Engineer @ Netflix",    college: "IIT Delhi",   verified: true, isPremium: false, has24h: false },
-];
+import API from "../../../utils/api";
 
 const SearchIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -21,7 +14,23 @@ const SearchIcon = () => (
 export default function Networking() {
   const { user } = useAuth();
   const [search,  setSearch]  = useState("");
+  const [alumniList, setAlumniList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const hasSearch = search.trim().length > 0;
+
+  useEffect(() => {
+    const fetchAlumni = async () => {
+      try {
+        const res = await API.get("/users/alumni");
+        setAlumniList(res.data.alumni || []);
+      } catch (err) {
+        console.error("Networking fetch error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAlumni();
+  }, []);
 
   const normalize = (value = "") =>
     value
@@ -62,11 +71,12 @@ export default function Networking() {
     }, 0);
   };
 
-  const suggestedAlumni = [...ALL_ALUMNI].sort((a, b) => scoreAlumni(b) - scoreAlumni(a));
+  const suggestedAlumni = [...alumniList].sort((a, b) => scoreAlumni(b) - scoreAlumni(a));
 
-  const filtered = ALL_ALUMNI.filter(a => {
-    const matchSearch  = a.name.toLowerCase().includes(search.toLowerCase()) ||
-                         a.role.toLowerCase().includes(search.toLowerCase());
+  const filtered = alumniList.filter(a => {
+    const matchSearch  = a.name?.toLowerCase().includes(search.toLowerCase()) ||
+                         a.role?.toLowerCase().includes(search.toLowerCase()) ||
+                         a.company?.toLowerCase().includes(search.toLowerCase());
     return matchSearch;
   });
 
@@ -149,7 +159,7 @@ export default function Networking() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {(hasSearch ? filtered : suggestedAlumni).map((alumni, i) => (
-              <div key={alumni.id} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 50}ms` }}>
+              <div key={alumni._id || alumni.id} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 50}ms` }}>
                 <AlumniCard alumni={alumni} />
               </div>
             ))}

@@ -4,6 +4,7 @@ import MainLayout from "../../components/layout/MainLayout";
 import CrownIcon from "../../components/common/CrownIcon";
 import PostCard from "../../components/feed/PostCard";
 import PaymentModal from "../../components/academics/PaymentModal";
+import API from "../../utils/api";
 import { getPostsByAlumniName } from "../../utils/alumniData";
 
 const BackIcon = () => (
@@ -22,24 +23,89 @@ const CheckIcon = () => (
   </svg>
 );
 
-const DUMMY_SESSIONS = [
-  { id: 1, title: "System Design Deep Dive", date: "25 Apr 2026", price: 999, seats: 5 },
-  { id: 2, title: "FAANG Interview Prep", date: "30 Apr 2026", price: 1499, seats: 12 },
-];
+
 
 export default function StudentAlumniProfile() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const alumni = state?.alumni;
-  const alumniPosts = Array.isArray(state?.posts) && state.posts.length > 0
-    ? state.posts
-    : getPostsByAlumniName(alumni?.name);
+  const [alumni, setAlumni] = useState(state?.alumni || null);
+  const [loading, setLoading] = useState(!alumni);
+  const alumniId = state?.alumniId || alumni?._id || alumni?.id;
+  const [items, setItems] = useState([]);
+  const [posts, setPosts] = useState(state?.posts || []);
+
   const [connectStatus, setConnectStatus] = useState("connect");
   const [activeTab, setActiveTab] = useState("About");
-  const [membershipTaken, setMembershipTaken] = useState(Boolean(alumni?.subscribed || alumni?.membershipTaken));
+  const [membershipTaken, setMembershipTaken] = useState(false);
   const [showMembershipPayment, setShowMembershipPayment] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  useEffect(() => {
+    if (alumni) {
+      setMembershipTaken(Boolean(alumni.subscribed || alumni.membershipTaken));
+    }
+  }, [alumni]);
 
   const allowsMembership = Boolean(alumni?.membershipEnabled || alumni?.isPremium || alumni?.priceMonth);
+
+  useEffect(() => {
+    if (!alumniId) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [userRes, postsRes, coursesRes, sessionsRes] = await Promise.all([
+          !alumni ? API.get(`/users/${alumniId}`) : Promise.resolve({ data: { user: alumni } }),
+          posts.length === 0 ? API.get(`/posts/user/${alumniId}`) : Promise.resolve({ data: { posts } }),
+          API.get("/courses"),
+          API.get("/sessions")
+        ]);
+
+        if (!alumni) setAlumni(userRes.data.user);
+        if (posts.length === 0) setPosts(postsRes.data.posts || []);
+
+        const matchedCourses = (coursesRes.data.courses || []).filter(c => c.instructor?._id === alumniId).map(c => ({
+          ...c, id: c._id, type: "course", date: new Date(c.createdAt).toLocaleDateString(), seatsLeft: 100
+        }));
+        const matchedSessions = (sessionsRes.data.sessions || []).filter(s => s.instructor?._id === alumniId).map(s => ({
+          ...s, id: s._id, type: s.type || "session", date: s.date ? new Date(s.date).toLocaleDateString() : "", seatsLeft: s.totalSeats - (s.enrolledStudents?.length || 0)
+        }));
+        setItems([...matchedCourses, ...matchedSessions]);
+      } catch (err) {
+        console.error("Alumni profile error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [alumniId]);
+
+  useEffect(() => {
+    if (!alumniId) return;
+    const fetchStatus = async () => {
+      try {
+        const res = await API.get(`/connections/status/${alumniId}`);
+        if (res.data.status === "none") setConnectStatus("connect");
+        else setConnectStatus(res.data.status);
+      } catch (err) {
+        console.error("fetch status error", err);
+      }
+    };
+    fetchStatus();
+  }, [alumniId]);
+
+  const handleConnect = async () => {
+    if (connectStatus !== "connect" || connecting) return;
+    setConnecting(true);
+    try {
+      await API.post(`/connections/${alumniId}`);
+      setConnectStatus("pending");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const TABS = ["About", "Posts", "Sessions", "Reviews"];
 
@@ -58,6 +124,16 @@ export default function StudentAlumniProfile() {
       mainContainer.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
   }, []);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div style={{ maxWidth: 720, margin: "60px auto", textAlign: "center", color: "var(--text-3)" }}>
+          Loading alumni profile...
+        </div>
+      </MainLayout>
+    );
+  }
 
   if (!alumni) {
     return (
@@ -168,7 +244,7 @@ export default function StudentAlumniProfile() {
                   </button>
                 )}
                 {connectStatus === "connected" && (
-                  <button onClick={() => navigate("/messages")} style={{
+                  <button onClick={() => navigate(`/messages?user=${alumniId}`)} style={{
                     display: "flex", alignItems: "center", gap: 7,
                     padding: "10px 18px", borderRadius: 11,
                     background: "rgba(0,229,195,0.1)", border: "1px solid rgba(0,229,195,0.3)",
@@ -179,7 +255,8 @@ export default function StudentAlumniProfile() {
                   </button>
                 )}
                 <button
-                  onClick={() => { if (connectStatus === "connect") setConnectStatus("pending"); else if (connectStatus === "pending") setConnectStatus("connected"); }}
+                  onClick={handleConnect}
+                  disabled={connecting}
                   style={{
                     padding: "10px 22px", borderRadius: 11, border: "none",
                     fontSize: 13, fontWeight: 700, fontFamily: "Plus Jakarta Sans", cursor: "pointer",
@@ -296,14 +373,14 @@ export default function StudentAlumniProfile() {
         {/* Posts tab */}
         {activeTab === "Posts" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s ease" }}>
-            {alumniPosts.length === 0 ? (
+            {posts.length === 0 ? (
               <div style={{ textAlign: "center", padding: "44px 20px", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 16 }}>
                 <p style={{ fontSize: 34, marginBottom: 10 }}>📝</p>
                 <p style={{ fontSize: 14, color: "var(--text-3)" }}>No posts available for this alumni yet.</p>
               </div>
             ) : (
-              alumniPosts.map(post => (
-                <PostCard key={post.id} post={post} />
+              posts.map(post => (
+                <PostCard key={post._id || post.id} post={post} />
               ))
             )}
           </div>
@@ -312,19 +389,25 @@ export default function StudentAlumniProfile() {
         {/* Sessions tab */}
         {activeTab === "Sessions" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s ease" }}>
-            {DUMMY_SESSIONS.map(s => (
+            {items.length === 0 && (
+              <p style={{ fontSize: 13, color: "var(--text-3)", textAlign: "center", padding: 20 }}>No courses or sessions available yet.</p>
+            )}
+            {items.map(s => (
               <div key={s.id} style={{
                 background: "var(--bg-3)", border: "1px solid var(--border)",
                 borderRadius: 16, padding: "18px 20px",
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
               }}>
                 <div>
-                  <h4 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 4 }}>{s.title}</h4>
-                  <p style={{ fontSize: 12, color: "var(--text-3)" }}>📅 {s.date} · {s.seats} seats left</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <h4 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{s.title}</h4>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: "rgba(124,92,252,0.1)", color: "var(--purple-light)", textTransform: "uppercase" }}>{s.type}</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--text-3)" }}>📅 {s.date} · {s.seatsLeft || "Unlimited"} seats left</p>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 18, color: "var(--text)", marginBottom: 8 }}>₹{s.price}</p>
-                  <button style={{
+                  <button onClick={() => navigate(s.type === "course" ? "/academics" : "/academics", { state: { item: s } })} style={{
                     padding: "7px 16px", background: "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
                     border: "none", borderRadius: 9, color: "white", fontSize: 12, fontWeight: 700,
                     fontFamily: "Plus Jakarta Sans", cursor: "pointer",

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../../utils/api";
 
 const MessageIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -15,11 +16,39 @@ const companies = {
 export default function AlumniCard({ alumni }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState("connect");
+  const [loading, setLoading] = useState(false);
 
-  const handleConnect = (e) => {
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const id = alumni._id || alumni.id;
+        if (!id) return;
+        const res = await API.get(`/connections/status/${id}`);
+        // assume backend returns { status: 'none', 'pending', 'connected' } or similar
+        // Adjusting our local "connect" to match what we use locally
+        if (res.data.status === "none") setStatus("connect");
+        else setStatus(res.data.status);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkStatus();
+  }, [alumni]);
+
+  const handleConnect = async (e) => {
     e.stopPropagation();
-    if (status === "connect") setStatus("pending");
-    else if (status === "pending") setStatus("connected");
+    if (status !== "connect" || loading) return;
+    
+    setLoading(true);
+    try {
+      const id = alumni._id || alumni.id;
+      await API.post(`/connections/${id}`);
+      setStatus("pending");
+    } catch (err) {
+      console.error("Connection request failed", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const companyName = alumni.role?.split("@ ")[1] || "";
@@ -81,7 +110,7 @@ export default function AlumniCard({ alumni }) {
       <div style={{ display: "flex", gap: 7, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
         {status === "connected" && (
           <button
-            onClick={() => navigate("/messages")}
+            onClick={() => navigate(`/messages?user=${alumni._id || alumni.id}`)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "7px 12px", borderRadius: 9,

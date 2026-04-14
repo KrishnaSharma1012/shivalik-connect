@@ -14,38 +14,8 @@ const StarIcon = () => (
   </svg>
 );
 
-/* ── Mock Data ── */
-const ACTIVE_MEMBERSHIP_CONVERSATIONS = [
-  { id: 1, name: "Arjun Mehta", role: "Student · Active Membership", lastMessage: "Can we schedule a mock interview session?", time: "5m", unread: 3, online: true, subscribed: true, avatar: "A" },
-  { id: 2, name: "Priya Nair", role: "Student · Active Membership", lastMessage: "Thank you for the resume review!", time: "22m", unread: 1, online: true, subscribed: true, avatar: "P" },
-  { id: 3, name: "Rohan Das", role: "Student · Active Membership", lastMessage: "When is your next DSA session?", time: "1h", unread: 0, online: false, subscribed: true, avatar: "R" },
-];
-
-const BASIC_CONVERSATIONS = [
-  { id: 4, name: "Sneha Kapoor", role: "Student · Free", lastMessage: "Hi, I had a question about your workshop", time: "3h", unread: 2, online: false, subscribed: false, avatar: "S" },
-  { id: 5, name: "Vikram Singh", role: "Student · Free", lastMessage: "Could you review my LinkedIn profile?", time: "1d", unread: 0, online: false, subscribed: false, avatar: "V" },
-  { id: 6, name: "Neha Joshi", role: "Student · Free", lastMessage: "Interested in your React course", time: "2d", unread: 0, online: true, subscribed: false, avatar: "N" },
-];
-
-const INITIAL_MESSAGES = {
-  1: [
-    { sender: "them", text: "Hi! I just subscribed to your Pro plan. Super excited to get mentorship from you.", time: "10:10 AM" },
-    { sender: "me", text: "Welcome aboard! Let me know what you're preparing for.", time: "10:15 AM" },
-    { sender: "them", text: "Can we schedule a mock interview session?", time: "10:30 AM" },
-  ],
-  2: [
-    { sender: "them", text: "I just submitted my resume — could you give it a quick look?", time: "Yesterday" },
-    { sender: "me", text: "Sure, sent you the detailed review on email.", time: "Yesterday" },
-    { sender: "them", text: "Thank you for the resume review!", time: "Yesterday" },
-  ],
-  3: [
-    { sender: "them", text: "Really enjoying your sessions. When is your next DSA session?", time: "2 days ago" },
-    { sender: "me", text: "This Saturday at 4 PM IST — check the sessions tab!", time: "2 days ago" },
-  ],
-  4: [{ sender: "them", text: "Hi, I had a question about your workshop on system design.", time: "3h ago" }],
-  5: [{ sender: "them", text: "Could you review my LinkedIn profile? Would really appreciate it.", time: "1d ago" }],
-  6: [{ sender: "them", text: "I'm interested in your React course. Is it still open for enrollment?", time: "2d ago" }],
-};
+import API from "../../../utils/api";
+import { useLocation } from "react-router-dom";
 
 /* ── Conversation Item ── */
 function ConversationItem({ chat, active, onClick }) {
@@ -87,39 +57,91 @@ function ConversationItem({ chat, active, onClick }) {
 /* ── Main ── */
 export default function AlumniMessages() {
   const { user } = useAuth();
-  const hasActiveMembership = user?.alumniMembershipActive ?? (user?.alumniPlan === "premium");
-  const visibleActiveMembershipChats = hasActiveMembership ? ACTIVE_MEMBERSHIP_CONVERSATIONS : [];
-  const defaultChat = visibleActiveMembershipChats[0] || BASIC_CONVERSATIONS[0] || null;
+  const location = useLocation();
 
-  const [activeChat, setActiveChat] = useState(defaultChat);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [conversations, setConversations] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef();
 
-  useEffect(() => {
-    if (!activeChat) {
-      setActiveChat(defaultChat);
-      return;
-    }
+  const hasActiveMembership = user?.alumniMembershipActive ?? (user?.alumniPlan === "premium");
 
-    if (!hasActiveMembership && activeChat.subscribed) {
-      setActiveChat(BASIC_CONVERSATIONS[0] || null);
-    }
-  }, [hasActiveMembership, activeChat, defaultChat]);
+  useEffect(() => {
+    fetchConversations();
+  }, [location.search]);
+
+  const fetchConversations = async () => {
+    try {
+      const res = await API.get("/messages/conversations");
+      const formatted = res.data.conversations.map(c => ({
+        id: c.partner?._id,
+        name: c.partner?.name,
+        company: c.partner?.company || c.partner?.role,
+        lastMessage: c.lastMessage,
+        time: new Date(c.lastTime).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" }),
+        unread: c.unread,
+        avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
+        color: "#7C5CFC",
+        // Dummy logic to assume true if they enrolled or subscribed. 
+        // We'll mark as true so alumni can talk to them if they are an active student.
+        subscribed: c.partner?.role === "student"
+      })).filter(c => c.id);
+      
+      setConversations(formatted);
+      
+      const searchParams = new URLSearchParams(location.search);
+      const userParam = searchParams.get("user");
+      
+      if (userParam) {
+        const existing = formatted.find(c => c.id === userParam);
+        if (existing) setActiveChat(existing);
+        else setActiveChat({ id: userParam, name: "New Conversation", company: "Start chatting...", avatar: "N", color: "#7C5CFC", subscribed: true });
+      } else if (formatted.length > 0 && !activeChat) {
+        setActiveChat(formatted[0]);
+      }
+    } catch(err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    if (activeChat?.id) fetchMessages(activeChat.id);
+  }, [activeChat]);
+
+  const fetchMessages = async (userId) => {
+    try {
+      const res = await API.get(`/messages/${userId}`);
+      const formatted = res.data.messages.map(m => ({
+         sender: m.sender._id === userId ? "them" : "me",
+         text: m.content,
+         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
+      }));
+      setMessages(formatted);
+    } catch(err) { console.error(err); }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeChat]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || !activeChat) return;
-    setMessages(prev => ({ ...prev, [activeChat.id]: [...(prev[activeChat.id] || []), { sender: "me", text: input, time: "Just now" }] }));
+    const textToSend = input.trim();
     setInput("");
+    
+    setMessages(prev => [...prev, { sender: "me", text: textToSend, time: "Just now" }]);
+    
+    try {
+      await API.post(`/messages/${activeChat.id}`, { content: textToSend });
+      fetchConversations();
+    } catch (err) { console.error(err); }
   };
 
-  const currentMsgs = messages[activeChat?.id] || [];
+  const currentMsgs = messages || [];
+  const visibleActiveMembershipChats = hasActiveMembership ? conversations.filter(c => c.subscribed) : [];
+  const basicChats = conversations.filter(c => !c.subscribed);
+
   const totalActiveMembershipUnread = visibleActiveMembershipChats.reduce((s, c) => s + c.unread, 0);
-  const totalBasicUnread = BASIC_CONVERSATIONS.reduce((s, c) => s + c.unread, 0);
+  const totalBasicUnread = basicChats.reduce((s, c) => s + c.unread, 0);
 
   return (
     <MainLayout>
@@ -131,7 +153,7 @@ export default function AlumniMessages() {
           <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border)" }}>
             <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Messages</h2>
             <p style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>
-              {visibleActiveMembershipChats.length + BASIC_CONVERSATIONS.length} conversations
+              {visibleActiveMembershipChats.length + basicChats.length} conversations
             </p>
           </div>
 
@@ -184,7 +206,7 @@ export default function AlumniMessages() {
               </div>
             </div>
 
-            {BASIC_CONVERSATIONS.map(chat => (
+            {basicChats.map(chat => (
               <ConversationItem key={chat.id} chat={chat} active={activeChat?.id === chat.id} onClick={setActiveChat} />
             ))}
           </div>

@@ -9,33 +9,8 @@ const SendIcon = () => (
   </svg>
 );
 
-/* ── Mock Data ── */
-const CONVERSATIONS = [
-  { id: 1, name: "Rahul Sharma", company: "Google · SWE", lastMessage: "I can guide you for DSA prep.", time: "5m", unread: 2, online: true, avatar: "R", color: "#7C5CFC", membershipTaken: true },
-  { id: 2, name: "Ananya Iyer", company: "Amazon · PM", lastMessage: "Join my React workshop this Saturday!", time: "1h", unread: 1, online: true, avatar: "A", color: "#06B6D4", membershipTaken: true },
-  { id: 3, name: "Karan Bhatia", company: "Microsoft · ML", lastMessage: "Happy to help with your resume.", time: "3h", unread: 0, online: false, avatar: "K", color: "#10B981", membershipTaken: false },
-  { id: 4, name: "Meera Pillai", company: "Flipkart · Backend", lastMessage: "Let me know if you have questions.", time: "1d", unread: 0, online: false, avatar: "M", color: "#F59E0B", membershipTaken: true },
-];
-
-const INITIAL_MESSAGES = {
-  1: [
-    { sender: "them", text: "Hey! What are you preparing for?", time: "10:00 AM" },
-    { sender: "me", text: "Hi Rahul! Targeting product companies for SDE roles.", time: "10:05 AM" },
-    { sender: "them", text: "I can guide you for DSA prep.", time: "10:10 AM" },
-  ],
-  2: [
-    { sender: "them", text: "Hi! I'm hosting a React workshop this weekend.", time: "Yesterday" },
-    { sender: "me", text: "That sounds great! What topics will you cover?", time: "Yesterday" },
-    { sender: "them", text: "Join my React workshop this Saturday!", time: "Yesterday" },
-  ],
-  3: [
-    { sender: "them", text: "I noticed you're interested in ML roles.", time: "3h ago" },
-    { sender: "them", text: "Happy to help with your resume.", time: "3h ago" },
-  ],
-  4: [
-    { sender: "them", text: "Let me know if you have questions.", time: "1d ago" },
-  ],
-};
+import API from "../../../utils/api";
+import { useLocation } from "react-router-dom";
 
 /* ── Conversation Item ── */
 function ConversationItem({ chat, active, onClick }) {
@@ -74,24 +49,97 @@ function ConversationItem({ chat, active, onClick }) {
 
 /* ── Main ── */
 export default function StudentMessages() {
-  const [activeChat, setActiveChat] = useState(CONVERSATIONS[0]);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const location = useLocation();
+  
+  const [conversations, setConversations] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef();
+
+  useEffect(() => {
+    fetchConversations();
+  }, [location.search]);
+
+  const fetchConversations = async () => {
+    try {
+      const res = await API.get("/messages/conversations");
+      const formatted = res.data.conversations.map(c => ({
+        id: c.partner?._id,
+        name: c.partner?.name,
+        company: c.partner?.company || c.partner?.role,
+        lastMessage: c.lastMessage,
+        time: new Date(c.lastTime).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" }),
+        unread: c.unread,
+        avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
+        color: "#7C5CFC",
+        membershipTaken: c.partner?.alumniPlan === "premium"
+      })).filter(c => c.id); // Valid partners only
+      
+      setConversations(formatted);
+      
+      const searchParams = new URLSearchParams(location.search);
+      const userParam = searchParams.get("user");
+      
+      if (userParam) {
+        // Find existing or set temporary active chat
+        const existing = formatted.find(c => c.id === userParam);
+        if (existing) {
+          setActiveChat(existing);
+        } else {
+          setActiveChat({
+            id: userParam,
+            name: "New Conversation",
+            company: "Start chatting...",
+            avatar: "N",
+            color: "#7C5CFC"
+          });
+        }
+      } else if (formatted.length > 0 && !activeChat) {
+        setActiveChat(formatted[0]);
+      }
+    } catch(err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    if (activeChat?.id) {
+       fetchMessages(activeChat.id);
+    }
+  }, [activeChat]);
+
+  const fetchMessages = async (userId) => {
+    try {
+      const res = await API.get(`/messages/${userId}`);
+      const formatted = res.data.messages.map(m => ({
+         sender: m.sender._id === userId ? "them" : "me",
+         text: m.content,
+         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
+      }));
+      setMessages(formatted);
+    } catch(err) { console.error(err); }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeChat]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || !activeChat) return;
-    setMessages(prev => ({ ...prev, [activeChat.id]: [...(prev[activeChat.id] || []), { sender: "me", text: input, time: "Just now" }] }));
+    const textToSend = input.trim();
     setInput("");
+    
+    // Optimistic update
+    setMessages(prev => [...prev, { sender: "me", text: textToSend, time: "Just now" }]);
+    
+    try {
+      await API.post(`/messages/${activeChat.id}`, { content: textToSend });
+      fetchConversations(); // refresh side list
+    } catch (err) { console.error(err); }
   };
 
-  const currentMsgs = messages[activeChat?.id] || [];
-  const membershipChats = CONVERSATIONS.filter(c => c.membershipTaken);
-  const regularChats = CONVERSATIONS.filter(c => !c.membershipTaken);
+  const currentMsgs = messages || [];
+  const membershipChats = conversations.filter(c => c.membershipTaken);
+  const regularChats = conversations.filter(c => !c.membershipTaken);
 
   return (
     <MainLayout>
@@ -105,7 +153,7 @@ export default function StudentMessages() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
               <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Messages</h2>
             </div>
-            <p style={{ fontSize: 12, color: "var(--text-3)" }}>{CONVERSATIONS.length} alumni conversations</p>
+            <p style={{ fontSize: 12, color: "var(--text-3)" }}>{conversations.length} alumni conversations</p>
           </div>
 
           {/* Conversations */}

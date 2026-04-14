@@ -5,12 +5,10 @@ import { useAuth } from "../../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
   combineDateTime,
-  createVideoEntry,
-  getAlumniItems,
   formatAcademicDate,
-  isItemLive,
-  upsertAlumniItem,
+  isItemLive
 } from "../../../utils/academicCatalog";
+import API from "../../../utils/api";
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -108,7 +106,11 @@ function UploadPreview({ label, value, onChange, accept, helperText, buttonLabel
           style={{ display: "none" }}
           onChange={e => {
             const file = e.target.files?.[0];
-            if (file) onChange(URL.createObjectURL(file));
+            if (file) {
+              const reader = new FileReader();
+              reader.onloadend = () => onChange(reader.result);
+              reader.readAsDataURL(file);
+            }
             e.target.value = "";
           }}
         />
@@ -168,20 +170,15 @@ function SessionModal({ onClose, onSave }) {
 
   const handleSave = () => {
     if (!valid) return;
-    onSave({
-      id: Date.now(), type: "session",
+    const payload = {
+      type: "session",
       title: form.title, description: form.description,
-      date: form.date, time: form.time, duration: form.duration,
+      date: form.date, time: form.time, duration: parseInt(form.duration) || 60,
       price: Number(form.price),
       totalSeats: Number(form.seats) || 20,
-      seatsLeft: Number(form.seats) || 20,
-      enrolled: 0, isLive: false,
-      scheduledAt: combineDateTime(form.date, form.time),
-      videos: form.videos,
-      thumbnail: form.thumbnail,
-      thumbnailRatio: form.thumbnailRatio,
-      thumbnailFit: form.thumbnailFit,
-    });
+      thumbnail: form.thumbnail
+    };
+    onSave(payload);
     onClose();
   };
 
@@ -271,21 +268,15 @@ function WorkshopModal({ onClose, onSave }) {
 
   const handleSave = () => {
     if (!valid) return;
-    onSave({
-      id: Date.now(), type: "workshop",
+    const payload = {
+      type: "workshop",
       title: form.title, description: form.description,
-      date: form.date, time: form.time, duration: form.duration,
-      prerequisites: form.prerequisites, outcome: form.outcome,
+      date: form.date, time: form.time, duration: parseInt(form.duration) || 120,
       price: Number(form.price),
       totalSeats: Number(form.seats) || 30,
-      seatsLeft: Number(form.seats) || 30,
-      enrolled: 0, isLive: false,
-      scheduledAt: combineDateTime(form.date, form.time),
-      videos: form.videos,
-      thumbnail: form.thumbnail,
-      thumbnailRatio: form.thumbnailRatio,
-      thumbnailFit: form.thumbnailFit,
-    });
+      thumbnail: form.thumbnail
+    };
+    onSave(payload);
     onClose();
   };
 
@@ -388,22 +379,12 @@ function CourseModal({ onClose, onSave }) {
 
   const handleSave = () => {
     if (!valid) return;
-    onSave({
-      id: Date.now(), type: "course",
+    const payload = {
       title: form.title, description: form.overview,
-      instructor: form.instructor, duration: form.duration,
-      level: form.level, language: form.language,
-      prerequisites: form.prerequisites,
-      outcomes: form.outcomes.filter(Boolean),
-      syllabus: form.syllabus.filter(r => r.week || r.topic || r.video),
-      price: Number(form.price),
-      totalSeats: Number(form.seats) || 50,
-      seatsLeft: Number(form.seats) || 50,
-      enrolled: 0, isLive: false,
-      thumbnail: form.thumbnail,
-      thumbnailRatio: form.thumbnailRatio,
-      thumbnailFit: form.thumbnailFit,
-    });
+      duration: form.duration, level: form.level || "beginner",
+      price: Number(form.price), thumbnail: form.thumbnail
+    };
+    onSave(payload, "course");
     onClose();
   };
 
@@ -744,7 +725,27 @@ function SessionCard({ s, i }) {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12, gap: 10 }}>
+          <button
+            onClick={() => handleDelete(s)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 11,
+              background: "transparent",
+              border: "1px solid rgba(255,68,68,0.2)",
+              color: "#FF6B6B",
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: "Plus Jakarta Sans",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <TrashIcon />
+          </button>
           <button
             onClick={e => {
               e.stopPropagation();
@@ -870,19 +871,71 @@ export default function Sessions() {
   const { user } = useAuth();
   const isPremium = user?.alumniPlan === "premium";
 
-  const [sessions, setSessions] = useState(() => getAlumniItems());
+  const [sessions, setSessions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [openModal, setOpenModal] = useState(null); // "session" | "workshop" | "course"
 
-  const addItem = (item) => {
-    const nextItems = upsertAlumniItem(item);
-    setSessions(nextItems);
+  const fetchItems = async () => {
+    try {
+      const [cr, sr] = await Promise.all([
+        API.get("/courses/my"),
+        API.get("/sessions/my")
+      ]);
+      const myCourses = (cr.data.courses || []).map(c => ({
+        id: c._id, type: "course",
+        title: c.title, description: c.description || "",
+        date: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "", time: "",
+        duration: c.duration || "", price: c.price,
+        totalSeats: 100, enrolled: c.enrolledStudents?.length || 0,
+        isLive: false, thumbnail: c.thumbnail || ""
+      }));
+      const mySessions = (sr.data.sessions || []).map(s => ({
+        id: s._id, type: s.type || "session",
+        title: s.title, description: s.description || "",
+        date: s.date ? new Date(s.date).toLocaleDateString() : "", time: s.time || "",
+        duration: s.duration || 60, price: s.price,
+        totalSeats: s.totalSeats || 50, enrolled: s.enrolledStudents?.length || 0,
+        isLive: s.isLive || false, thumbnail: s.thumbnail || ""
+      }));
+      setSessions([...myCourses, ...mySessions]);
+    } catch(err) {
+      console.error(err);
+    }
   };
 
-  const handleStartLive = (item) => {
-    const nextItem = { ...item, isLive: true };
-    const nextItems = upsertAlumniItem(nextItem);
-    setSessions(nextItems);
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+  const addItem = async (payload, targetType) => {
+    try {
+      if (targetType === "course" || payload.type === "course") {
+        await API.post("/courses", payload);
+      } else {
+        await API.post("/sessions", payload);
+      }
+      fetchItems();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleStartLive = async (item) => {
+    if (item.type === "course") return;
+    try {
+      await API.patch(`/sessions/${item.id}/live`);
+      fetchItems();
+    } catch(err) { console.error(err); }
+  };
+
+  const handleDelete = async (item) => {
+    if (!window.confirm(`Are you sure you want to delete "${item.title}"?`)) return;
+    try {
+      const type = item.type === "course" ? "courses" : "sessions";
+      await API.delete(`/${type}/${item.id}`);
+      fetchItems();
+    } catch (err) {
+      console.error("Delete error", err);
+      alert("Failed to delete item");
+    }
   };
 
   const scheduledItems = sessions.filter(item => item.type === "session" || item.type === "workshop");
@@ -1021,27 +1074,46 @@ export default function Sessions() {
                               <span style={{ fontSize: 12, color: "var(--text-3)" }}>⏰ {item.time}</span>
                               <span style={{ fontSize: 12, color: "var(--text-3)" }}>💰 ₹{Number(item.price).toLocaleString()}</span>
                             </div>
-                            <button
-                              onClick={() => handleStartLive(item)}
-                              disabled={!ready || item.isLive}
-                              style={{
-                                padding: "9px 14px",
-                                borderRadius: 11,
-                                border: ready && !item.isLive ? "none" : "1px solid var(--border)",
-                                background: item.isLive
-                                  ? "rgba(0,229,195,0.12)"
-                                  : ready
-                                  ? "linear-gradient(135deg, #00E5C3, #7C5CFC)"
-                                  : "var(--bg-4)",
-                                color: item.isLive ? "var(--teal)" : ready ? "white" : "var(--text-3)",
-                                fontSize: 13,
-                                fontWeight: 700,
-                                cursor: ready && !item.isLive ? "pointer" : "not-allowed",
-                                fontFamily: "Plus Jakarta Sans",
-                              }}
-                            >
-                              {item.isLive ? "Live now" : ready ? "Start live streaming" : "Not live yet"}
-                            </button>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                onClick={() => handleStartLive(item)}
+                                disabled={!ready || item.isLive}
+                                style={{
+                                  flex: 1,
+                                  padding: "9px 14px",
+                                  borderRadius: 11,
+                                  border: ready && !item.isLive ? "none" : "1px solid var(--border)",
+                                  background: item.isLive
+                                    ? "rgba(0,229,195,0.12)"
+                                    : ready
+                                    ? "linear-gradient(135deg, #00E5C3, #7C5CFC)"
+                                    : "var(--bg-4)",
+                                  color: item.isLive ? "var(--teal)" : ready ? "white" : "var(--text-3)",
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  cursor: ready && !item.isLive ? "pointer" : "not-allowed",
+                                  fontFamily: "Plus Jakarta Sans",
+                                }}
+                              >
+                                {item.isLive ? "Live now" : ready ? "Start live streaming" : "Not live yet"}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                style={{
+                                  padding: "9px 12px",
+                                  borderRadius: 11,
+                                  border: "1px solid rgba(255,68,68,0.2)",
+                                  background: "rgba(255,68,68,0.06)",
+                                  color: "#FF6B6B",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -17,7 +17,7 @@ const CameraIcon = () => (
 
 export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCoverChange }) {
   const initial = (user.name || "U")[0].toUpperCase();
-  const isAlumni = user.role?.includes("@") || user.isAlumni;
+  const isAlumni = user.role === "alumni" || user.isAlumni;
 
   const avatarRef = useRef();
   const coverRef = useRef();
@@ -152,7 +152,9 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
               </span>
             )}
           </div>
-          <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 4 }}>{user.role || "Your Role"}</p>
+          <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 4 }}>
+            {user.title} {user.company ? `@ ${user.company}` : ""}
+          </p>
           {user.college && (
             <p style={{ fontSize: 13, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 5 }}>
               🎓 {user.college}
