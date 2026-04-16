@@ -61,7 +61,10 @@ export const createPost = async (req, res) => {
     if (media.length > 0) {
       uploadedMedia = await Promise.all(
         media.map(file =>
-          uploadImage(file, "posts").then(res => res.url)
+          uploadImage(file, "posts").then(res => ({
+            url: res.url,
+            type: res.resource_type === 'video' ? 'video' : 'image'
+          }))
         )
       );
     }
