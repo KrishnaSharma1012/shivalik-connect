@@ -100,7 +100,7 @@ For Alumni:
 // ─── Intent Detection ──────────────────────────────────────────────────────────
 function detectIntent(message) {
   const m = message.toLowerCase();
-  if (/list.*alumni|show.*alumni|find.*alumni|alumni.*skill|alumni.*company/i.test(m)) return "alumni_search";
+  if (/list.*alumni|show.*alumni|find.*alumni|suggest.*alumni|alumni.*skill|alumni.*company|alumni.*from|alumni.*at|alumni.*who|.*alumni.*from\s+\w+/i.test(m)) return "alumni_search";
   if (/list.*course|show.*course|find.*course|available.*course|what.*course/i.test(m)) return "course_search";
   if (/list.*session|show.*session|find.*session|book.*session/i.test(m)) return "session_search";
   if (/how many (user|student|alumni)|total (user|student|alumni)|user count|platform stat/i.test(m)) return "stats";
@@ -116,15 +116,17 @@ async function queryDB(intent, message) {
     if (intent === "alumni_search") {
       // Extract possible skill/company keyword
       const skillMatch = message.match(/(?:skilled in|knows?|expert in|with skill[s]?)\s+([a-zA-Z#+.]+)/i);
-      const compMatch  = message.match(/(?:at|from|in)\s+([A-Z][a-zA-Z\s]+(?:Inc|Ltd|Corp|Technologies|Labs)?)/);
+      // Fix: match any company name after "from" or "at" regardless of case or suffix
+      const compMatch  = message.match(/(?:from|at)\s+([a-zA-Z][a-zA-Z0-9\s&.,'-]{1,40}?)(?:\s*$|\s+(?:and|or|who|with)\b)/i);
       const query = {};
-      if (skillMatch) query.skills = { $regex: skillMatch[1], $options: "i" };
-      if (compMatch)  query.company = { $regex: compMatch[1].trim(), $options: "i" };
+      if (skillMatch) query.skills  = { $regex: skillMatch[1].trim(), $options: "i" };
+      if (compMatch)  query.company = { $regex: compMatch[1].trim(),  $options: "i" };
 
       const alumni = await db.collection("alumni")
         .find(query, { projection: { _id: 0, name: 1, company: 1, role: 1, skills: 1, premium: 1 } })
         .limit(5).toArray();
-      return alumni.length ? { type: "alumni", data: alumni } : null;
+      // Always return a result object so the LLM gets explicit DB feedback (empty or not)
+      return { type: "alumni", data: alumni };
     }
 
     if (intent === "course_search") {
@@ -208,7 +210,11 @@ app.post("/chat", async (req, res) => {
   } else if (!isLandingPublicMode) {
     const dbResult = await queryDB(intent, message);
     if (dbResult) {
-      dataContext = `\n\n=== LIVE DATABASE RESULTS ===\n${JSON.stringify(dbResult.data, null, 2)}\nUse this data to answer accurately.`;
+      if (dbResult.type === "alumni" && dbResult.data.length === 0) {
+        dataContext = `\n\n=== LIVE DATABASE RESULTS ===\nNo alumni found matching that query in the database. Do NOT invent or suggest alumni names. Tell the user no matching alumni were found and suggest they browse the Networking tab directly.`;
+      } else {
+        dataContext = `\n\n=== LIVE DATABASE RESULTS ===\n${JSON.stringify(dbResult.data, null, 2)}\nUse ONLY this data. Do not invent or add names or details not present above.`;
+      }
     }
   }
 
@@ -242,4 +248,5 @@ app.post("/chat", async (req, res) => {
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => res.json({ status: "ok", db: !!db }));
 
-app.listen(5000, () => console.log("🚀 Connect AI Node server on port 5000"));
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`🚀 Connect AI Node server on port ${PORT}`));

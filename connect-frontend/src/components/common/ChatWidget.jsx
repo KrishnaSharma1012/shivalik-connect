@@ -97,7 +97,7 @@ function BotMessage({ text }) {
 }
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_AI_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_AI_API_URL || "http://localhost:5001";
 
 export default function ChatWidget() {
   const { user } = useAuth();

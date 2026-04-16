@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 import faiss, json, numpy as np
@@ -10,6 +11,14 @@ import logging
 
 load_dotenv()
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 logger = logging.getLogger(__name__)
@@ -94,26 +103,45 @@ class QueryRequest(BaseModel):
     message: str
     user_skills: list[str] = []
 
-@app.post("/analyze")
-def analyze(req: QueryRequest):
+
+class PredictRequest(BaseModel):
+    student_skills: str | list[str]
+    student_interests: str | list[str]
+    target_domain: str
+    top_n: int = 3
+
+
+def _normalize_to_text(value: str | list[str]) -> str:
+    if isinstance(value, list):
+        return ", ".join([v.strip() for v in value if isinstance(v, str) and v.strip()])
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _normalize_to_list(value: str | list[str]) -> list[str]:
+    if isinstance(value, list):
+        return [v.strip() for v in value if isinstance(v, str) and v.strip()]
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()]
+    return []
+
+
+def _run_analysis(message: str, user_skills: list[str]):
     if index is None or not roles:
         raise HTTPException(status_code=503, detail=f"AI engine not ready: {startup_error}")
 
-    # Embed the user query
-    q_vec = model.encode(req.message).reshape(1, -1).astype("float32")
+    q_vec = model.encode(message).reshape(1, -1).astype("float32")
     _, idxs = index.search(q_vec, 3)
     best = roles[idxs[0][0]]
 
     required = best["skills"]
-    missing = [s for s in required if s not in req.user_skills]
+    user_skills_set = {s.lower() for s in user_skills}
+    missing = [s for s in required if s.lower() not in user_skills_set]
 
-    # Pull alumni from MongoDB
     alumni = list(db.alumni.find(
         {"skills": {"$in": required}},
         {"_id": 0, "name": 1, "company": 1, "role": 1, "premium": 1}
     ).limit(3))
 
-    # Pull courses for missing skills
     courses = list(db.courses.find(
         {"skills": {"$in": missing}},
         {"_id": 0, "title": 1, "price": 1}
@@ -124,5 +152,58 @@ def analyze(req: QueryRequest):
         "required_skills": required,
         "missing_skills": missing,
         "alumni": alumni,
-        "courses": courses
+        "courses": courses,
+    }
+
+@app.post("/analyze")
+def analyze(req: QueryRequest):
+    return _run_analysis(req.message, req.user_skills)
+
+
+@app.get("/domains")
+def get_domains():
+    return {
+        "available_domains": sorted({role["role"] for role in roles}) if roles else []
+    }
+
+
+@app.post("/predict")
+def predict(req: PredictRequest):
+    skills_text = _normalize_to_text(req.student_skills)
+    interests_text = _normalize_to_text(req.student_interests)
+    skills_list = _normalize_to_list(req.student_skills)
+
+    message_parts = [
+        f"Target domain: {req.target_domain.strip()}" if req.target_domain.strip() else "",
+        f"Skills: {skills_text}" if skills_text else "",
+        f"Interests: {interests_text}" if interests_text else "",
+    ]
+    message = ". ".join([part for part in message_parts if part])
+
+    analysis = _run_analysis(message or "Career guidance", skills_list)
+
+    top_n = max(1, min(req.top_n, 10))
+    required_skills = analysis.get("required_skills", [])
+    predictions = [
+        {
+            "career_path": analysis.get("detected_role", "Recommended Path"),
+            "match_score": f"{max(50, min(95, 100 - len(analysis.get('missing_skills', [])) * 8))}%",
+            "experience_level": "Recommended",
+            "domain": req.target_domain,
+        }
+    ]
+
+    for skill in required_skills[:max(0, top_n - 1)]:
+        predictions.append({
+            "career_path": f"{skill} Specialist",
+            "match_score": "60%",
+            "experience_level": "Beginner to Intermediate",
+            "domain": req.target_domain,
+        })
+
+    return {
+        "student_profile": f"Skills: {skills_text}. Interests: {interests_text}",
+        "target_domain": req.target_domain,
+        "predictions": predictions[:top_n],
+        "analysis": analysis,
     }
