@@ -4,8 +4,18 @@ import { useAuth } from "../../context/AuthContext";
 import { signupUser, googleAuth } from "../../services/authService";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+import API from "../../utils/api";
 import CrownIcon from "../../components/common/CrownIcon";
 
+// ─── Allowed college domains (mirrors backend list) ──────────────────────────
+const ALLOWED_DOMAINS = [
+  "shivalik.edu",
+  "shivalik.ac.in",
+  "shivalikgroup.edu.in",
+  "student.shivalik.edu",
+];
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 const EyeIcon = ({ open }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -26,13 +36,22 @@ const CheckIcon = () => (
   </svg>
 );
 
+const ShieldIcon = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <polyline points="9 12 11 14 15 10"/>
+  </svg>
+);
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function Signup() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
 
   const routeState = location.state || {};
-  const [step, setStep] = useState(routeState.role ? 2 : 1);
+  const [step, setStep] = useState(routeState.role ? 2 : 1); // 1 | 2 | "otp" | 3
   const [form, setForm] = useState({
     name: "", email: "", password: "", confirmPassword: "",
     role: routeState.role || "",
@@ -40,50 +59,48 @@ export default function Signup() {
     alumniPlan: routeState.plan || "simple",
   });
   const [roleLocked] = useState(!!routeState.role);
-  const [error, setError] = useState("");
+  const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPwd, setShowPwd] = useState(false);
+  const [showPwd, setShowPwd]   = useState(false);
   const [showCpwd, setShowCpwd] = useState(false);
+
+  // ── OTP state ──
+  const [otpCode, setOtpCode]       = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError]     = useState("");
+  const [otpResendTimer, setOtpResendTimer] = useState(0);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  // ── Google sign-up ──
   const signupWithGoogle = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        setLoading(true);
-        setError("");
+        setLoading(true); setError("");
         const userInfo = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
-
         const data = await googleAuth({
           name: userInfo.data.name,
           email: userInfo.data.email,
           avatar: userInfo.data.picture,
           role: form.role,
         });
-
         localStorage.setItem("token", data.token);
         localStorage.setItem("userId", data.user._id);
         login(data.user);
-
-        if (form.role === "alumni") {
-          setStep(3);
-        } else {
-          navigate("/feed");
-        }
+        if (form.role === "alumni") setStep(3);
+        else navigate("/feed");
       } catch (err) {
         setError(err.response?.data?.message || "Google Signup failed");
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     },
     onError: () => setError("Google Signup Failed"),
   });
 
+  // ── Password strength ──
   const pwdStrength = () => {
-    const p = form.password;
-    if (!p) return 0;
+    const p = form.password; if (!p) return 0;
     let s = 0;
     if (p.length >= 8) s++;
     if (/[A-Z]/.test(p)) s++;
@@ -95,7 +112,36 @@ export default function Signup() {
   const strengthColors = ["", "var(--danger)", "var(--orange)", "var(--purple-light)", "var(--teal)"];
   const strengthLabels = ["", "Weak", "Fair", "Good", "Strong"];
 
-  const handleNext = () => {
+  // ── Domain validation helper ──
+  const isValidStudentEmail = (email) => {
+    const domain = email.split("@")[1]?.toLowerCase();
+    return domain && ALLOWED_DOMAINS.includes(domain);
+  };
+
+  // ── Start resend countdown ──
+  const startResendTimer = () => {
+    setOtpResendTimer(60);
+    const t = setInterval(() => {
+      setOtpResendTimer(prev => {
+        if (prev <= 1) { clearInterval(t); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // ── Send OTP ──
+  const handleSendOTP = async () => {
+    try {
+      setOtpLoading(true); setOtpError("");
+      await API.post("/auth/send-otp", { email: form.email });
+      startResendTimer();
+    } catch (err) {
+      setOtpError(err.response?.data?.message || "Failed to send OTP. Please try again.");
+    } finally { setOtpLoading(false); }
+  };
+
+  // ── Step 2 → OTP or alumni plan ──
+  const handleNext = async () => {
     if (step === 1) {
       if (!form.role) { setError("Please select a role"); return; }
       setError(""); setStep(2);
@@ -106,43 +152,72 @@ export default function Signup() {
       if (form.password !== form.confirmPassword) { setError("Passwords don't match"); return; }
       if (strength < 2) { setError("Password is too weak"); return; }
       setError("");
-      if (form.role === "alumni") setStep(3);
-      else handleSubmit();
+
+      if (form.role === "student") {
+        // Validate college email domain first
+        if (!isValidStudentEmail(form.email)) {
+          setError(`Only college email addresses are allowed. Accepted domains: ${ALLOWED_DOMAINS.join(", ")}`);
+          return;
+        }
+        // Send OTP and go to OTP step
+        try {
+          setLoading(true);
+          await API.post("/auth/send-otp", { email: form.email });
+          startResendTimer();
+          setStep("otp");
+        } catch (err) {
+          setError(err.response?.data?.message || "Failed to send OTP. Please try again.");
+        } finally { setLoading(false); }
+      } else {
+        // Alumni → go to plan selection
+        setStep(3);
+      }
     }
   };
 
+  // ── Verify OTP then create account ──
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setOtpError("Please enter the 6-digit code"); return;
+    }
+    try {
+      setOtpLoading(true); setOtpError("");
+      await API.post("/auth/verify-otp", { email: form.email, otp: otpCode });
+      // OTP verified → create account
+      await handleSubmit();
+    } catch (err) {
+      setOtpError(err.response?.data?.message || "Invalid OTP. Please try again.");
+    } finally { setOtpLoading(false); }
+  };
+
+  // ── Final signup ──
   const handleSubmit = async (overridePlan) => {
     try {
-      setLoading(true);
-      setError("");
-      
+      setLoading(true); setError("");
       const payload = {
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        role: form.role,
-        college: form.college,
-        company: form.company,
+        name: form.name, email: form.email,
+        password: form.password, role: form.role,
+        college: form.college, company: form.company,
         alumniPlan: overridePlan || form.alumniPlan,
       };
-
       const data = await signupUser(payload);
-
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.user._id);
       login(data.user);
-
       if (data.user.role === "student") navigate("/feed");
       else navigate("/alumni/dashboard/feed");
-
     } catch (err) {
       setError(err.response?.data?.message || "Signup failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      if (step === "otp") setOtpError(err.response?.data?.message || "Signup failed.");
+    } finally { setLoading(false); }
   };
 
+  // ── Accent colors ──
   const roleAccent = { student: "var(--purple)", alumni: "var(--orange)" };
+
+  // ── Step label logic ──
+  const totalSteps = form.role === "alumni" ? 3 : form.role === "student" ? 3 : 2;
+  const displayStep = step === "otp" ? 3 : step;
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "var(--bg)", color: "var(--text)" }}>
@@ -177,41 +252,38 @@ export default function Signup() {
 
           <div>
             <p style={{ fontSize: 12, color: "var(--text-3)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 20 }}>
-              Step {step} of {form.role === "alumni" ? "3" : "2"}
+              Step {displayStep} of {totalSteps}
             </p>
             {[
               { n: 1, label: "Choose role" },
               { n: 2, label: "Your details" },
-              ...(form.role === "alumni" ? [{ n: 3, label: "Choose plan" }] : []),
+              ...(form.role === "student" ? [{ n: 3, label: "Verify college email" }] : []),
+              ...(form.role === "alumni"  ? [{ n: 3, label: "Choose plan" }] : []),
             ].map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: "50%",
-                  background: step > s.n
+                  background: displayStep > s.n
                     ? "linear-gradient(135deg, var(--teal), #00B8A0)"
-                    : step === s.n
+                    : displayStep === s.n
                     ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)"
                     : "var(--bg-4)",
-                  border: `1.5px solid ${step >= s.n ? "transparent" : "var(--border)"}`,
+                  border: `1.5px solid ${displayStep >= s.n ? "transparent" : "var(--border)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: step >= s.n ? "white" : "var(--text-3)",
-                  fontSize: 13, fontWeight: 700,
-                  transition: "all 0.3s",
+                  color: displayStep >= s.n ? "white" : "var(--text-3)",
+                  fontSize: 13, fontWeight: 700, transition: "all 0.3s",
                 }}>
-                  {step > s.n ? <CheckIcon /> : s.n}
+                  {displayStep > s.n ? <CheckIcon /> : s.n}
                 </div>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: step >= s.n ? "var(--text)" : "var(--text-3)" }}>
-                    {s.label}
-                  </p>
-                </div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: displayStep >= s.n ? "var(--text)" : "var(--text-3)" }}>
+                  {s.label}
+                </p>
               </div>
             ))}
 
             <div style={{ height: 1, background: "var(--border)", margin: "24px 0" }} />
-
             <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.7 }}>
-              <strong style={{ color: "var(--text)" }}>Students</strong> get personalised alumni feeds, course access, and guided support.<br /><br />
+              <strong style={{ color: "var(--text)" }}>Students</strong> must verify with their official college email.<br /><br />
               <strong style={{ color: "var(--text)" }}>Alumni</strong> earn from sessions and host on campuses.
             </p>
           </div>
@@ -223,17 +295,13 @@ export default function Signup() {
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 24px" }}>
         <div className="anim-fadeUp opacity-0" style={{ width: "100%", maxWidth: 440 }}>
 
-          {/* Top navigation */}
+          {/* Top nav */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--text-3)", fontSize: 13, fontWeight: 500,
-                padding: "4px 0",
-                transition: "color 0.2s",
-              }}
+            <button onClick={() => navigate("/")} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--text-3)", fontSize: 13, fontWeight: 500, padding: "4px 0", transition: "color 0.2s",
+            }}
               onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
               onMouseLeave={e => e.currentTarget.style.color = "var(--text-3)"}
             >
@@ -243,22 +311,15 @@ export default function Signup() {
               Back to home
             </button>
 
-            {step > 1 && (
-              <button
-                onClick={() => {
-                  if (step === 2) {
-                    if (roleLocked) navigate("/");
-                    else setStep(1);
-                  } else {
-                    setStep(2);
-                  }
-                }}
-                style={{
-                  background: "none", border: "none", color: "var(--text-3)",
-                  fontSize: 14, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "4px 0",
-                }}
-              >
+            {step !== 1 && (
+              <button onClick={() => {
+                if (step === "otp") { setStep(2); setOtpCode(""); setOtpError(""); }
+                else if (step === 2) { if (roleLocked) navigate("/"); else setStep(1); }
+                else if (step === 3) setStep(form.role === "alumni" ? 2 : "otp");
+              }} style={{
+                background: "none", border: "none", color: "var(--text-3)",
+                fontSize: 14, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0",
+              }}>
                 ← Back
               </button>
             )}
@@ -282,23 +343,23 @@ export default function Signup() {
                     value: "student", label: "Student",
                     desc: "Looking for mentorship, courses, and career guidance from alumni",
                     perks: ["Free to join", "Membership-based alumni access", "College partner discounts"],
+                    note: "⚠️ Requires official college email",
                   },
                   {
                     value: "alumni", label: "Alumni",
                     desc: "Ready to share knowledge and host sessions",
                     perks: ["Host paid sessions (Premium)", "Higher revenue share"],
+                    note: null,
                   },
                 ].map(r => (
-                  <div key={r.value}
-                    onClick={() => set("role", r.value)}
-                    style={{
-                      padding: "20px 22px", borderRadius: 16, cursor: "pointer",
-                      border: `1.5px solid ${form.role === r.value ? roleAccent[r.value] : "var(--border)"}`,
-                      background: form.role === r.value
-                        ? `linear-gradient(135deg, ${roleAccent[r.value]}18, rgba(255,255,255,0.02))`
-                        : "var(--bg-3)",
-                      transition: "all 0.2s",
-                    }}>
+                  <div key={r.value} onClick={() => set("role", r.value)} style={{
+                    padding: "20px 22px", borderRadius: 16, cursor: "pointer",
+                    border: `1.5px solid ${form.role === r.value ? roleAccent[r.value] : "var(--border)"}`,
+                    background: form.role === r.value
+                      ? `linear-gradient(135deg, ${roleAccent[r.value]}18, rgba(255,255,255,0.02))`
+                      : "var(--bg-3)",
+                    transition: "all 0.2s",
+                  }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                       <div>
                         <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 17 }}>{r.label}</p>
@@ -309,8 +370,7 @@ export default function Signup() {
                           width: 20, height: 20, borderRadius: "50%",
                           border: `2px solid ${form.role === r.value ? roleAccent[r.value] : "var(--border)"}`,
                           background: form.role === r.value ? roleAccent[r.value] : "transparent",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          transition: "all 0.2s",
+                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                         }}>
                           {form.role === r.value && <CheckIcon />}
                         </div>
@@ -326,6 +386,9 @@ export default function Signup() {
                         }}>{p}</span>
                       ))}
                     </div>
+                    {r.note && (
+                      <p style={{ fontSize: 11, color: "var(--orange)", marginTop: 10, fontWeight: 600 }}>{r.note}</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -345,21 +408,43 @@ export default function Signup() {
                 Setting up your <strong style={{ color: "var(--text)" }}>{form.role}</strong> account
               </p>
 
+              {/* Student domain notice */}
+              {form.role === "student" && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+                  background: "rgba(124,92,252,0.08)", border: "1px solid rgba(124,92,252,0.25)",
+                  fontSize: 12, color: "var(--text-3)", lineHeight: 1.6,
+                }}>
+                  🎓 <strong style={{ color: "var(--purple-light)" }}>College email required.</strong>{" "}
+                  Use your official college email (e.g. <code style={{ color: "var(--teal)" }}>name@shivalik.ac.in</code>). A verification code will be sent.
+                </div>
+              )}
+
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
-                    Full Name
-                  </label>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Full Name</label>
                   <input className="dark-input" placeholder="Arjun Sharma" value={form.name}
                     onChange={e => set("name", e.target.value)} />
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
-                    Email address
+                    {form.role === "student" ? "College Email Address" : "Email Address"}
                   </label>
-                  <input type="email" className="dark-input" placeholder="you@email.com" value={form.email}
-                    onChange={e => set("email", e.target.value)} />
+                  <input type="email" className="dark-input"
+                    placeholder={form.role === "student" ? "you@shivalik.ac.in" : "you@email.com"}
+                    value={form.email} onChange={e => set("email", e.target.value)}
+                    style={{
+                      borderColor: form.email && form.role === "student"
+                        ? isValidStudentEmail(form.email) ? "rgba(0,229,195,0.4)" : "rgba(255,75,110,0.4)"
+                        : undefined,
+                    }}
+                  />
+                  {form.email && form.role === "student" && (
+                    <p style={{ fontSize: 11, marginTop: 4, color: isValidStudentEmail(form.email) ? "var(--teal)" : "var(--danger)" }}>
+                      {isValidStudentEmail(form.email) ? "✓ Valid college email" : `✗ Must use: ${ALLOWED_DOMAINS.join(", ")}`}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -367,23 +452,20 @@ export default function Signup() {
                     {form.role === "student" ? "College Name" : "Current Company"}
                   </label>
                   <input className="dark-input"
-                    placeholder={form.role === "student" ? "e.g. IIT Delhi, DTU…" : "e.g. Google, Amazon…"}
+                    placeholder={form.role === "student" ? "e.g. Shivalik College of Engineering" : "e.g. Google, Amazon…"}
                     value={form.role === "student" ? form.college : form.company}
                     onChange={e => set(form.role === "student" ? "college" : "company", e.target.value)} />
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
-                    Password
-                  </label>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Password</label>
                   <div style={{ position: "relative" }}>
                     <input type={showPwd ? "text" : "password"} className="dark-input"
                       placeholder="Create a strong password" value={form.password}
                       onChange={e => set("password", e.target.value)} style={{ paddingRight: 44 }} />
                     <button onClick={() => setShowPwd(!showPwd)}
                       style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-                        background: "none", border: "none", color: "var(--text-3)", cursor: "pointer",
-                        display: "flex", alignItems: "center" }}>
+                        background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", display: "flex", alignItems: "center" }}>
                       <EyeIcon open={showPwd} />
                     </button>
                   </div>
@@ -391,11 +473,7 @@ export default function Signup() {
                     <div style={{ marginTop: 8 }}>
                       <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
                         {[1, 2, 3, 4].map(i => (
-                          <div key={i} style={{
-                            flex: 1, height: 3, borderRadius: 2,
-                            background: i <= strength ? strengthColors[strength] : "var(--bg-4)",
-                            transition: "all 0.3s",
-                          }} />
+                          <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= strength ? strengthColors[strength] : "var(--bg-4)", transition: "all 0.3s" }} />
                         ))}
                       </div>
                       <p style={{ fontSize: 11, color: strengthColors[strength] }}>{strengthLabels[strength]}</p>
@@ -404,17 +482,14 @@ export default function Signup() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
-                    Confirm Password
-                  </label>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Confirm Password</label>
                   <div style={{ position: "relative" }}>
                     <input type={showCpwd ? "text" : "password"} className="dark-input"
                       placeholder="Repeat your password" value={form.confirmPassword}
                       onChange={e => set("confirmPassword", e.target.value)} style={{ paddingRight: 44 }} />
                     <button onClick={() => setShowCpwd(!showCpwd)}
                       style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-                        background: "none", border: "none", color: "var(--text-3)", cursor: "pointer",
-                        display: "flex", alignItems: "center" }}>
+                        background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", display: "flex", alignItems: "center" }}>
                       <EyeIcon open={showCpwd} />
                     </button>
                   </div>
@@ -428,14 +503,12 @@ export default function Signup() {
               )}
 
               <button className={form.role === "alumni" ? "btn-orange" : "btn-purple"}
-                onClick={handleNext}
-                disabled={loading}
+                onClick={handleNext} disabled={loading}
                 style={{ width: "100%", fontSize: 15, padding: 14, marginTop: 20,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  opacity: loading ? 0.7 : 1 }}>
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1 }}>
                 {loading
-                  ? <><span className="anim-spin" style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", display: "block" }} />Creating account…</>
-                  : form.role === "alumni" ? "Continue to Plan →" : "Create Account →"
+                  ? <><span className="anim-spin" style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", display: "block" }} />Sending code…</>
+                  : form.role === "alumni" ? "Continue to Plan →" : "Send Verification Code →"
                 }
               </button>
 
@@ -457,6 +530,90 @@ export default function Signup() {
             </div>
           )}
 
+          {/* ── STEP OTP: Email Verification ── */}
+          {step === "otp" && (
+            <div className="anim-fadeIn opacity-0">
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20,
+                  background: "linear-gradient(135deg, rgba(124,92,252,0.15), rgba(124,92,252,0.08))",
+                  border: "1px solid rgba(124,92,252,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--purple-light)",
+                }}>
+                  <ShieldIcon />
+                </div>
+              </div>
+
+              <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 26, marginBottom: 8, textAlign: "center" }}>
+                Verify your email
+              </h1>
+              <p style={{ color: "var(--text-2)", fontSize: 14, marginBottom: 6, textAlign: "center" }}>
+                We sent a 6-digit code to
+              </p>
+              <p style={{ color: "var(--purple-light)", fontSize: 15, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>
+                {form.email}
+              </p>
+
+              {/* OTP input */}
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="000000"
+                  style={{
+                    width: "100%", textAlign: "center",
+                    fontSize: 32, fontWeight: 800, letterSpacing: "0.3em",
+                    fontFamily: "Plus Jakarta Sans",
+                    padding: "16px 20px",
+                    background: "var(--bg-3)", border: "2px solid rgba(124,92,252,0.35)",
+                    borderRadius: 14, color: "var(--text)", outline: "none",
+                    transition: "border-color 0.2s",
+                  }}
+                  onFocus={e => e.target.style.borderColor = "rgba(124,92,252,0.7)"}
+                  onBlur={e => e.target.style.borderColor = "rgba(124,92,252,0.35)"}
+                />
+              </div>
+
+              {otpError && (
+                <div style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+                  background: "rgba(255,75,110,0.1)", border: "1px solid rgba(255,75,110,0.3)",
+                  color: "var(--danger)", fontSize: 13 }}>{otpError}</div>
+              )}
+
+              <button className="btn-purple" onClick={handleVerifyOTP} disabled={otpLoading || otpCode.length !== 6}
+                style={{ width: "100%", fontSize: 15, padding: 14,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  opacity: (otpLoading || otpCode.length !== 6) ? 0.6 : 1 }}>
+                {otpLoading
+                  ? <><span className="anim-spin" style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", display: "block" }} />Verifying…</>
+                  : "✓ Verify & Create Account"
+                }
+              </button>
+
+              {/* Resend */}
+              <p style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: "var(--text-3)" }}>
+                Didn't receive the code?{" "}
+                {otpResendTimer > 0 ? (
+                  <span style={{ color: "var(--text-3)" }}>Resend in {otpResendTimer}s</span>
+                ) : (
+                  <span
+                    style={{ color: "var(--purple-light)", cursor: "pointer", fontWeight: 600 }}
+                    onClick={handleSendOTP}
+                  >
+                    {otpLoading ? "Sending…" : "Resend code"}
+                  </span>
+                )}
+              </p>
+
+              <p style={{ textAlign: "center", marginTop: 10, fontSize: 11, color: "var(--text-3)" }}>
+                Code expires in 10 minutes. Check your spam folder if you don't see it.
+              </p>
+            </div>
+          )}
+
           {/* ── STEP 3: Alumni Plan ── */}
           {step === 3 && (
             <div className="anim-fadeIn opacity-0">
@@ -466,6 +623,7 @@ export default function Signup() {
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
+                {/* Simple Plan */}
                 <div onClick={() => set("alumniPlan", "simple")} style={{
                   padding: "22px 24px", borderRadius: 16, cursor: "pointer",
                   border: `1.5px solid ${form.alumniPlan === "simple" ? "var(--teal)" : "var(--border)"}`,
@@ -474,9 +632,7 @@ export default function Signup() {
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 14 }}>
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18 }}>Simple</span>
-                      </div>
+                      <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18 }}>Simple</span><br />
                       <span style={{ fontSize: 20, fontFamily: "Plus Jakarta Sans", fontWeight: 800, color: "var(--teal)" }}>Free</span>
                       <span style={{ fontSize: 13, color: "var(--text-3)" }}> forever</span>
                     </div>
@@ -484,8 +640,7 @@ export default function Signup() {
                       width: 22, height: 22, borderRadius: "50%",
                       border: `2px solid ${form.alumniPlan === "simple" ? "var(--teal)" : "var(--border)"}`,
                       background: form.alumniPlan === "simple" ? "var(--teal)" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      transition: "all 0.2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                     }}>
                       {form.alumniPlan === "simple" && <CheckIcon />}
                     </div>
@@ -498,44 +653,34 @@ export default function Signup() {
                   ))}
                 </div>
 
+                {/* Premium Plan */}
                 <div onClick={() => set("alumniPlan", "premium")} style={{
                   padding: "22px 24px", borderRadius: 16, cursor: "pointer",
                   border: `1.5px solid ${form.alumniPlan === "premium" ? "var(--orange)" : "var(--border)"}`,
                   background: form.alumniPlan === "premium"
                     ? "linear-gradient(135deg, rgba(255,112,67,0.08), rgba(255,154,108,0.05))"
                     : "var(--bg-3)",
-                  transition: "all 0.2s",
-                  position: "relative",
+                  transition: "all 0.2s", position: "relative",
                 }}>
-                  <span style={{ position: "absolute", top: 16, right: 16, display: "inline-flex", alignItems: "center" }}>
+                  <span style={{ position: "absolute", top: 16, right: 16, display: "inline-flex" }}>
                     <CrownIcon size={18} />
                   </span>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 14 }}>
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18 }}>Premium</span>
-                      </div>
-                      <span style={{ fontSize: 20, fontFamily: "Plus Jakarta Sans", fontWeight: 800, color: "var(--orange)" }}>₹999</span>
+                      <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18 }}>Premium</span><br />
+                      <span style={{ fontSize: 20, fontFamily: "Plus Jakarta Sans", fontWeight: 800, color: "var(--orange)" }}>₹499</span>
                       <span style={{ fontSize: 13, color: "var(--text-3)" }}> /month</span>
                     </div>
                     <div style={{
                       width: 22, height: 22, borderRadius: "50%",
                       border: `2px solid ${form.alumniPlan === "premium" ? "var(--orange)" : "var(--border)"}`,
                       background: form.alumniPlan === "premium" ? "var(--orange)" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      transition: "all 0.2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                     }}>
                       {form.alumniPlan === "premium" && <CheckIcon />}
                     </div>
                   </div>
-                  {[
-                    "Everything in Simple",
-                    "Upload courses & workshops",
-                    "Host live sessions (set your fee)",
-                    "Keep 80% of all revenue",
-                    "College campus hosting + extra pay",
-                    "Featured profile in search",
-                  ].map((f, i) => (
+                  {["Everything in Simple", "Upload courses & workshops", "Host live sessions (set your fee)", "Keep 80% of all revenue", "College campus hosting + extra pay", "Featured profile in search"].map((f, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                       <span style={{ color: "var(--orange)", fontSize: 12 }}>✓</span>
                       <span style={{ fontSize: 13, color: i === 0 ? "var(--text-3)" : "var(--text-2)" }}>{f}</span>
@@ -555,8 +700,7 @@ export default function Signup() {
               <button className="btn-orange" onClick={() => handleSubmit(form.alumniPlan)}
                 disabled={loading} style={{
                   width: "100%", fontSize: 15, padding: 14,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  opacity: loading ? 0.7 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1,
                 }}>
                 {loading
                   ? <><span className="anim-spin" style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", display: "block" }} />Creating account…</>
@@ -565,6 +709,7 @@ export default function Signup() {
               </button>
             </div>
           )}
+
         </div>
       </div>
 

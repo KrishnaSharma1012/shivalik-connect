@@ -1,6 +1,37 @@
 
 import BaseUser from "../models/BaseUser.js";
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+
+// ─────────────────────────────────────────────
+// ALLOWED COLLEGE EMAIL DOMAINS
+// Add your college's email domain(s) here
+// ─────────────────────────────────────────────
+const ALLOWED_STUDENT_DOMAINS = [
+  "shivalik.edu",
+  "shivalik.ac.in",
+  "shivalikgroup.edu.in",
+  "student.shivalik.edu",
+  // Add more college domains here as needed
+];
+
+// ─────────────────────────────────────────────
+// IN-MEMORY OTP STORE (expires after 10 min)
+// ─────────────────────────────────────────────
+const otpStore = new Map(); // email -> { otp, expiresAt }
+
+// ─────────────────────────────────────────────
+// EMAIL TRANSPORTER
+// ─────────────────────────────────────────────
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 // ─────────────────────────────────────────────
 // GENERATE TOKEN
 // ─────────────────────────────────────────────
@@ -20,39 +51,113 @@ const generateToken = (userId) => {
 // ─────────────────────────────
 export const signup = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, college, company, alumniPlan } = req.body;
+
+    // ✅ For students: enforce college email domain
+    if (role === "student" || !role) {
+      const emailDomain = email.split("@")[1]?.toLowerCase();
+      if (!emailDomain || !ALLOWED_STUDENT_DOMAINS.includes(emailDomain)) {
+        return res.status(400).json({
+          message: `Only college emails are allowed for student registration. Accepted domains: ${ALLOWED_STUDENT_DOMAINS.join(", ")}`
+        });
+      }
+    }
 
     // 🔍 check existing user
     const existingUser = await BaseUser.findOne({ email });
-
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     // ✅ create user
     const user = await BaseUser.create({
-      name,
-      email,
-      password,
+      name, email, password,
       role: role || "student",
+      college: college || "",
+      company: company || "",
+      alumniPlan: role === "alumni" ? (alumniPlan || "simple") : undefined,
     });
 
     // ✅ generate token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET
-    );
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const fullUser = await BaseUser.findById(user._id).select("-password");
 
-    res.status(201).json({
-      message: "Signup successful",
-      user,
-      token,
-    });
+    res.status(201).json({ message: "Signup successful", user: fullUser, token });
 
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ message: err.message });
   }
+};
+
+// ─────────────────────────────────────────────
+// SEND OTP (for email verification)
+// ─────────────────────────────────────────────
+export const sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    // Validate domain for students
+    const emailDomain = email.split("@")[1]?.toLowerCase();
+    if (!emailDomain || !ALLOWED_STUDENT_DOMAINS.includes(emailDomain)) {
+      return res.status(400).json({
+        message: `Only college emails are allowed. Accepted domains: ${ALLOWED_STUDENT_DOMAINS.join(", ")}`
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    otpStore.set(email.toLowerCase(), { otp, expiresAt });
+
+    // Send email
+    await transporter.sendMail({
+      from: `"Connect Platform" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your Connect Verification Code",
+      html: `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; background: #0F1018; color: #fff; border-radius: 16px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #7C5CFC, #9B7EFF); padding: 28px 32px;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Connect·Verify</h1>
+          </div>
+          <div style="padding: 32px;">
+            <p style="font-size: 15px; color: #ccc; margin-bottom: 24px;">Use the code below to verify your college email address:</p>
+            <div style="background: #1a1b2e; border: 1px solid rgba(124,92,252,0.3); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 40px; font-weight: 800; letter-spacing: 10px; color: #9B7EFF;">${otp}</span>
+            </div>
+            <p style="font-size: 13px; color: #888;">This code expires in <strong style="color:#fff">10 minutes</strong>. Do not share it with anyone.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    res.json({ message: "OTP sent to your college email" });
+  } catch (err) {
+    console.error("Send OTP error:", err);
+    res.status(500).json({ message: "Failed to send OTP: " + err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// VERIFY OTP
+// ─────────────────────────────────────────────
+export const verifyOTP = (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ message: "Email and OTP are required" });
+
+  const record = otpStore.get(email.toLowerCase());
+  if (!record) return res.status(400).json({ message: "No OTP found. Please request a new one." });
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(email.toLowerCase());
+    return res.status(400).json({ message: "OTP expired. Please request a new one." });
+  }
+  if (record.otp !== otp.trim()) {
+    return res.status(400).json({ message: "Incorrect OTP. Please try again." });
+  }
+
+  otpStore.delete(email.toLowerCase()); // consume the OTP
+  res.json({ message: "Email verified successfully", verified: true });
 };
 // ─────────────────────────────────────────────
 // GOOGLE AUTH

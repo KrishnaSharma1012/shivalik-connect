@@ -7,20 +7,24 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🔹 Upload Image Function
+// 🔹 Upload Image/Video Function (supports base64 data URIs)
 export const uploadImage = async (file, folder = "connect_platform") => {
   try {
     const result = await cloudinary.uploader.upload(file, {
       folder,
+      resource_type: "auto",   // handles images AND videos
+      chunk_size: 6000000,      // 6MB chunks for large files
+      timeout: 120000,          // 2 min timeout for slow connections
     });
 
     return {
       public_id: result.public_id,
       url: result.secure_url,
+      resource_type: result.resource_type,
     };
   } catch (error) {
-    console.error("Cloudinary Upload Error:", error);
-    throw new Error("Image upload failed");
+    console.error("Cloudinary Upload Error:", error.message || error);
+    throw new Error(`Image upload failed: ${error.message || "Unknown error"}`);
   }
 };
 

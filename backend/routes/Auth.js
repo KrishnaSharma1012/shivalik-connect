@@ -5,7 +5,9 @@ import {
   getMe,
   logout,
   googleAuth,
-} from "../controllers/auth.js"; // ✅ FIX
+  sendOTP,
+  verifyOTP,
+} from "../controllers/auth.js";
 
 import { protect } from "../middleware/auth.js"; // ✅ FIX
 
@@ -17,7 +19,9 @@ const router = express.Router();
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/google", googleAuth);
-router.post("/logout", protect, logout); // ✅ better secured
+router.post("/logout", protect, logout);
+router.post("/send-otp", sendOTP);
+router.post("/verify-otp", verifyOTP);
 
 // ─────────────────────────────
 // USER
