@@ -35,6 +35,43 @@ export const DEFAULT_COURSES = [
     students: 2100,
     isCollegePartner: true,
   },
+  {
+    id: 4,
+    title: "Firebase",
+    instructor: "Prakhar Tagra (Google)",
+    description: "In this course students will learn about Firebase.",
+    price: 498,
+    originalPrice: 999,
+    rating: 4.9,
+    students: 540,
+    isCollegePartner: true,
+    syllabus: [
+      { 
+        week: "Week 1", topic: "Firebase Architecture & Setup", 
+        video: { url: "https://res.cloudinary.com/demo/video/upload/dog.mp4", duration: "12:45" } 
+      },
+      { 
+        week: "Week 2", topic: "Firestore Real-time Database", 
+        video: { url: "https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4", duration: "15:20" } 
+      },
+      { 
+        week: "Week 3", topic: "Firebase Authentication (Email/Google)", 
+        video: { url: "https://res.cloudinary.com/demo/video/upload/v1619001362/samples/elephants.mp4", duration: "18:10" } 
+      },
+       { 
+        week: "Week 4", topic: "Cloud Functions & Storage", 
+        video: { url: "https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4", duration: "14:30" } 
+      },
+      { 
+        week: "Week 5", topic: "Hosting & Deployment Guide", 
+        video: { url: "https://res.cloudinary.com/demo/video/upload/dog.mp4", duration: "10:15" } 
+      }
+    ],
+    assignments: [
+      { title: "Assignment 1: Data Modeling", description: "Design a Firestore schema for a Social Media app.", dueDate: "2026-05-10", marks: 100 },
+      { title: "Assignment 2: Cloud Triggers", description: "Create a function that sends email on user signup.", dueDate: "2026-05-20", marks: 100 }
+    ]
+  },
 ];
 
 export const DEFAULT_SESSIONS = [
@@ -215,7 +252,8 @@ export function getAcademicItemKey(item) {
 
 export async function enrollAcademicItem(item, paymentDetails = {}) {
   if (!item) return;
-  const type = item.type === "course" ? "courses" : "sessions";
+  const isCourse = item.type === "course" || item.modules; 
+  const type = isCourse ? "courses" : "sessions";
   try {
     const res = await API.post(`/${type}/${item.id}/enroll`, {
       paymentMethod: paymentDetails.method || "upi",
@@ -233,9 +271,25 @@ export function getEnrolledAcademicItems() {
   return getEnrollmentStore();
 }
 
-export function isAcademicItemEnrolled(item) {
-  const key = getAcademicItemKey(item);
-  return getEnrollmentStore().some(entry => entry.key === key);
+export function isAcademicItemEnrolled(item, user) {
+  if (!item || !user) return false;
+  
+  const itemId = (item.id || item._id)?.toString();
+  if (!itemId) return false;
+
+  const isCourse = item.type === "course" || item.modules; 
+  
+  if (isCourse) {
+    return (user.enrolledCourses || []).some(ec => {
+      const cid = (ec.course?._id || ec.course)?.toString();
+      return cid === itemId;
+    });
+  } else {
+    return (user.enrolledSessions || []).some(es => {
+      const sid = (es.session?._id || es.session)?.toString();
+      return sid === itemId;
+    });
+  }
 }
 
 export function getThumbnailStyle(item) {

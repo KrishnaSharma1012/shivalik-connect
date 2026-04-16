@@ -77,11 +77,15 @@ export const getUserById = async (req, res) => {
 // ─────────────────────────────────────────────
 export const updateProfile = async (req, res) => {
   try {
-    const { name, about, title, skills, college, company, avatar, coverPhoto, alumniPlan } = req.body;
+    const { 
+      name, email, about, title, skills, college, company, avatar, coverPhoto, alumniPlan,
+      joiningYear, passingYear, degree, branch
+    } = req.body;
 
     const updates = {};
 
     if (name) updates.name = name;
+    if (email) updates.email = email;
     if (about) updates.about = about;
     if (title) updates.title = title;
 
@@ -92,6 +96,10 @@ export const updateProfile = async (req, res) => {
 
     if (college) updates.college = college;
     if (company) updates.company = company;
+    if (joiningYear) updates.joiningYear = joiningYear;
+    if (passingYear) updates.passingYear = passingYear;
+    if (degree) updates.degree = degree;
+    if (branch) updates.branch = branch;
 
     // ✅ Allow alumni plan upgrade from profile update
     if (alumniPlan && req.user.role === "alumni") {

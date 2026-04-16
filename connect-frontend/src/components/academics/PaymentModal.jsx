@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { enrollAcademicItem } from "../../utils/academicCatalog";
+import UpiGateway from "./UpiGateway";
 
 const CloseIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -8,39 +9,48 @@ const CloseIcon = () => (
 );
 
 const METHODS = [
-  { id: "card", icon: "💳", label: "Credit / Debit Card",    sub: "Visa, Mastercard, Rupay" },
   { id: "upi",  icon: "📱", label: "UPI",                    sub: "GPay, PhonePe, Paytm"    },
+  { id: "card", icon: "💳", label: "Credit / Debit Card",    sub: "Visa, Mastercard, Rupay" },
   { id: "net",  icon: "🏦", label: "Net Banking",            sub: "All major banks supported" },
 ];
 
 export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess, skipEnrollment = false }) {
   const [method,  setMethod]  = useState("upi");
   const [loading, setLoading] = useState(false);
+  const [showGateway, setShowGateway] = useState(false);
   const [success, setSuccess] = useState(false);
 
   if (!isOpen || !course) return null;
 
-  const handlePayment = async () => {
+  const handleGatewayComplete = async ({ id, method }) => {
     try {
       setLoading(true);
-      // Simulate payment gateway delay
-      await new Promise(r => setTimeout(r, 1200));
-
       if (!skipEnrollment) {
-        await enrollAcademicItem(course, { method });
+        await enrollAcademicItem(course, { method, paymentId: id });
       }
       
       onPaymentSuccess?.(course);
       setSuccess(true);
       setTimeout(() => { 
         setSuccess(false); 
+        setShowGateway(false);
         onClose(); 
       }, 2000);
     } catch (err) {
       console.error("Payment modal enrollment error", err);
       alert(err.response?.data?.message || "Enrollment failed. Please try again.");
+      setShowGateway(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartPayment = () => {
+    if (method === "upi") {
+      setShowGateway(true);
+    } else {
+        // Simple simulator for card/net
+        handleGatewayComplete({ id: "pay_sim_" + Date.now(), method });
     }
   };
 
@@ -83,6 +93,19 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
                 : <>You're enrolled in <strong>{course.title}</strong>. Check your email for details.</>}
             </p>
           </div>
+        ) : showGateway ? (
+            <div style={{ padding: "12px" }}>
+                <UpiGateway 
+                    amount={course.price} 
+                    courseTitle={course.title} 
+                    onPaymentComplete={handleGatewayComplete} 
+                />
+                <button onClick={() => setShowGateway(false)} style={{
+                    marginTop: 12, width: "100%", padding: 10, background: "transparent",
+                    border: "none", color: "var(--text-3)", fontSize: 13, cursor: "pointer",
+                    fontFamily: "Plus Jakarta Sans"
+                }}>← Change Payment Method</button>
+            </div>
         ) : (
           <>
             {/* Header */}
@@ -107,7 +130,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 3 }}>{course.title}</p>
-                    <p style={{ fontSize: 12, color: "var(--text-2)" }}>by {course.instructor}</p>
+                    <p style={{ fontSize: 12, color: "var(--text-2)" }}>by {course.instructor?.name || course.instructor}</p>
                   </div>
                   {discount && (
                     <span style={{ padding: "3px 9px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: "rgba(0,229,195,0.1)", color: "var(--teal)" }}>{discount}% OFF</span>
@@ -155,7 +178,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
               </div>
 
               {/* Pay button */}
-              <button onClick={handlePayment} disabled={loading} style={{
+              <button onClick={handleStartPayment} disabled={loading} style={{
                 width: "100%", padding: "14px",
                 background: loading ? "var(--bg-4)" : "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
                 border: "none", borderRadius: 13,
@@ -168,7 +191,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
               }}>
                 {loading ? (
                   <><span style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "var(--purple)", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> Processing…</>
-                ) : `Pay ₹${course.price.toLocaleString()} →`}
+                ) : `Proceed to Pay ₹${course.price.toLocaleString()} →`}
               </button>
 
               <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>

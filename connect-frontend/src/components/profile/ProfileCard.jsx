@@ -171,9 +171,37 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
           <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 4 }}>
             {user.title} {user.company ? `@ ${user.company}` : ""}
           </p>
+          <p style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+            ✉️ {user.email}
+          </p>
           {user.college && (
-            <p style={{ fontSize: 13, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 5 }}>
+            <p style={{ fontSize: 13, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
               🎓 {user.college}
+              {user.college?.toLowerCase().includes("ajay kumar garg") && (
+                <span title="Certified AKGEC Alumnus" style={{ 
+                  background: "rgba(0, 229, 195, 0.12)", 
+                  color: "#00E5C3", 
+                  fontSize: 10, 
+                  fontWeight: 800, 
+                  padding: "2px 8px", 
+                  borderRadius: 6,
+                  border: "1px solid rgba(0, 229, 195, 0.3)",
+                  marginLeft: 4,
+                  textTransform: "uppercase"
+                }}>
+                  AKGEC Certified
+                </span>
+              )}
+            </p>
+          )}
+          {isAlumni && (user.degree || user.joiningYear) && (
+            <p style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 4 }}>
+              📜 {user.degree} {user.joiningYear ? `(${user.joiningYear} - ${user.passingYear || "Present"})` : ""}
+            </p>
+          )}
+          {isAlumni && (
+            <p style={{ fontSize: 13, color: "var(--purple-light)", fontWeight: 600, marginTop: 4 }}>
+              🤝 {user.connections?.length || 0} Connections
             </p>
           )}
         </div>

@@ -15,10 +15,14 @@ const labelStyle = {
 export default function EditProfile({ user = {}, onSave }) {
   const [form, setForm] = useState({
     name:    user.name    || "",
+    email:   user.email   || "",
     title:   user.title   || "",
     company: user.company || "",
     college: user.college || "",
     about:   user.about   || "",
+    degree:  user.degree  || "",
+    joiningYear: user.joiningYear || "",
+    passingYear: user.passingYear || "",
     skills:  user.skills?.join(", ") || "",
   });
 
@@ -33,9 +37,11 @@ export default function EditProfile({ user = {}, onSave }) {
 
   const fields = [
     { key: "name",    label: "Full Name",       placeholder: "e.g. Rahul Sharma"             },
+    { key: "email",   label: "Email Address",   placeholder: "e.g. rahul@example.com"        },
     { key: "title",   label: "Title / Position", placeholder: "e.g. Software Engineer" },
     { key: "company", label: "Company",         placeholder: "e.g. Google" },
-    { key: "college", label: "College",          placeholder: "e.g. IIT Delhi"                },
+    { key: "college", label: "College",          placeholder: "e.g. Ajay Kumar Garg Engineering College" },
+    { key: "degree",  label: "Degree",           placeholder: "e.g. B.Tech" },
   ];
 
   return (
@@ -54,6 +60,29 @@ export default function EditProfile({ user = {}, onSave }) {
           />
         </div>
       ))}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <label style={labelStyle}>Joining Year</label>
+          <input
+            type="number"
+            value={form.joiningYear}
+            onChange={e => set("joiningYear", e.target.value)}
+            placeholder="2020"
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Passing Year</label>
+          <input
+            type="number"
+            value={form.passingYear}
+            onChange={e => set("passingYear", e.target.value)}
+            placeholder="2024"
+            style={inputStyle}
+          />
+        </div>
+      </div>
 
       {/* About */}
       <div>

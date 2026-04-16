@@ -37,10 +37,10 @@ function AlumniProfile() {
 
         const statsData = earningsRes.data;
         setStats([
-          { label: "Sessions Taken", value: sessionsRes.data.sessions?.length || 0 },
+          { label: "Total Sessions", value: user.stats?.totalSessionsHosted || sessionsRes.data.sessions?.length || 0 },
           { label: "Students Mentored", value: statsData?.totalTransactions || 0 },
           { label: "Courses", value: coursesRes.data.courses?.length || 0 },
-          { label: "Earnings", value: `₹${(statsData?.totalGross || 0).toLocaleString()}` },
+          { label: "Total Earnings", value: `₹${(user.stats?.totalEarnings || statsData?.totalGross || 0).toLocaleString()}` },
         ]);
       } catch (err) {
         console.error("Error fetching profile data:", err);

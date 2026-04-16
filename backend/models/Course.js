@@ -80,6 +80,23 @@ const courseSchema = new mongoose.Schema(
       average: { type: Number, default: 0 },
       count:   { type: Number, default: 0 },
     },
+    
+    // ── Syllabus & Learning ───────────────────────────────────
+    syllabus: [{
+      week:  { type: String }, // e.g. "Week 1" or "Module 1"
+      topic: { type: String }, // e.g. "Introduction to Firebase"
+      video: {
+        url:  { type: String },
+        duration: { type: String },
+      },
+    }],
+
+    assignments: [{
+      title:       { type: String },
+      description: { type: String },
+      dueDate:     { type: Date },
+      marks:       { type: Number },
+    }],
 
     // ── Admin Approval ────────────────────────────────────────
     // Admin reviews in /admin/courses before course is visible to students

@@ -176,54 +176,65 @@ export const deleteCourse = async (req, res) => {
 export const enrollCourse = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
-
     if (!course) return res.status(404).json({ message: "Course not found" });
-
-    if (!course.isApproved) {
-      return res.status(400).json({ message: "Course is not available yet" });
-    }
 
     const userId = req.user._id;
 
-    const alreadyEnrolled = course.enrolledStudents.some(e => e.student && e.student.toString() === userId.toString());
+    // Fetch the Student document to update enrollment
+    const student = await Student.findById(userId);
+    if (!student) return res.status(404).json({ message: "Student account not found" });
+
+    const alreadyEnrolled = student.enrolledCourses.some(e => e.course?.toString() === course._id.toString());
     if (alreadyEnrolled) {
       return res.status(409).json({ message: "Already enrolled in this course" });
     }
 
     const { paymentMethod, amountPaid, paymentId } = req.body;
+    const grossAmount = Number(amountPaid) || course.price;
+    const platformFee = Math.round(grossAmount * PLATFORM_CUT);
 
-    // enroll
+    const enrollmentData = {
+      course: course._id,
+      paymentId: paymentId || `pay_${Math.random().toString(36).slice(2, 11)}`,
+      paymentMethod: paymentMethod || "upi",
+      amountPaid: grossAmount,
+      enrolledAt: new Date()
+    };
+
+    // 1. Update Student doc (this grants "access")
+    student.enrolledCourses.push(enrollmentData);
+    await student.save();
+
+    // 2. Update Course doc (for enrollment count/stats)
     course.enrolledStudents.push({
       student: userId,
-      paymentId: paymentId || "",
-      paymentMethod: paymentMethod || "upi",
-      amountPaid: Number(amountPaid) || course.price,
+      ...enrollmentData
     });
     await course.save();
 
-    // earnings calculation
-    const grossAmount = Number(amountPaid);
-    const platformFee = Math.round(grossAmount * PLATFORM_CUT);
-
+    // 3. Create Earning record for the alumnus
+    const alumniShare = Math.round(grossAmount * (1 - PLATFORM_CUT));
     await Earning.create({
       alumni: course.instructor,
       source: course._id,
       sourceModel: "Course",
       title: course.title,
-      grossAmount, // ✅ FIX
-      platformFee, // ✅ FIX
+      grossAmount,
+      platformFee,
+      alumniShare, // ✅ ADDED
       student: userId,
-      paymentMethod: paymentMethod || "upi",
-      paymentId: paymentId || null,
+      paymentMethod: enrollmentData.paymentMethod,
+      paymentId: enrollmentData.paymentId,
       type: "course",
     });
 
     res.json({
-      message: "Enrollment successful",
+      success: true,
+      message: "Enrollment successful! You can now access the course content.",
       courseId: course._id,
-      grossAmount,
     });
   } catch (err) {
+    console.error("Enrollment error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -235,7 +246,7 @@ export const approveCourse = async (req, res) => {
   try {
     const course = await Course.findByIdAndUpdate(
       req.params.id,
-      { status: "approved" },
+      { isApproved: true },
       { new: true }
     ).populate("instructor", "name email");
 

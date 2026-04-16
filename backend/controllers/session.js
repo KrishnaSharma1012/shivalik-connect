@@ -43,7 +43,7 @@ export const getSessions = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getMySessions = async (req, res) => {
   try {
-    const sessions = await Session.find({ instructor: req.user._id }) // ✅ FIX
+    const sessions = await Session.find({ instructor: req.user._id })
       .sort({ createdAt: -1 });
 
     res.json({ sessions });
@@ -57,7 +57,7 @@ export const getMySessions = async (req, res) => {
 // ─────────────────────────────────────────────
 export const createSession = async (req, res) => {
   try {
-    const user = await ((await Student.findById(req.user._id)) || (await Alumni.findById(req.user._id)) || (await Admin.findById(req.user._id))); // ✅ FIX
+    const user = await ((await Student.findById(req.user._id)) || (await Alumni.findById(req.user._id)) || (await Admin.findById(req.user._id)));
 
     if (user.alumniPlan !== "premium") {
       return res.status(403).json({ message: "Upgrade to Premium to host sessions" });
@@ -109,7 +109,7 @@ export const updateSession = async (req, res) => {
     const session = await Session.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    const isOwner = session.instructor.toString() === req.user._id.toString(); // ✅ FIX
+    const isOwner = session.instructor.toString() === req.user._id.toString();
     const isAdmin = req.user.role === "admin";
 
     if (!isOwner && !isAdmin) {
@@ -142,7 +142,7 @@ export const deleteSession = async (req, res) => {
     const session = await Session.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    const isOwner = session.instructor.toString() === req.user._id.toString(); // ✅ FIX
+    const isOwner = session.instructor.toString() === req.user._id.toString();
     const isAdmin = req.user.role === "admin";
 
     if (!isOwner && !isAdmin) {
@@ -177,38 +177,54 @@ export const enrollSession = async (req, res) => {
       return res.status(409).json({ message: "Already enrolled" });
     }
 
-    // ❌ DO NOT use seatsLeft stored value
     const seatsLeft = session.totalSeats - session.enrolledStudents.length;
-
     if (seatsLeft <= 0) {
       return res.status(400).json({ message: "No seats available" });
     }
 
     const { paymentMethod, amountPaid, paymentId } = req.body;
+    const grossAmount = Number(amountPaid) || session.price;
+    const platformFee = Math.round(grossAmount * PLATFORM_CUT);
 
+    const enrollmentData = {
+      session: session._id,
+      paymentId: paymentId || `pay_${Math.random().toString(36).slice(2, 11)}`,
+      paymentMethod: paymentMethod || "upi",
+      amountPaid: grossAmount,
+      enrolledAt: new Date()
+    };
+
+    // 1. Update Student doc (this gives the access)
+    const student = await Student.findById(userId);
+    if (!student) return res.status(404).json({ message: "Student account not found" });
+
+    const alreadyEnrolledInStudent = student.enrolledSessions.some(e => e.session?.toString() === session._id.toString());
+    if (!alreadyEnrolledInStudent) {
+      student.enrolledSessions.push(enrollmentData);
+      await student.save();
+    }
+
+    // 2. Update Session doc (for count/stats)
     session.enrolledStudents.push({
       student: userId,
-      paymentId: paymentId || "",
-      paymentMethod: paymentMethod || "upi",
-      amountPaid: Number(amountPaid) || session.price,
+      ...enrollmentData
     });
     await session.save();
 
-    // ✅ FIX earnings
-    const grossAmount = Number(amountPaid);
-    const platformFee = Math.round(grossAmount * PLATFORM_CUT);
-
+    // 3. Create Earnings
+    const alumniShare = Math.round(grossAmount * (1 - PLATFORM_CUT));
     await Earning.create({
       alumni: session.instructor,
       source: session._id,
       sourceModel: "Session",
       title: session.title,
-      grossAmount,   // ✅ FIX
-      platformFee,   // ✅ FIX
+      grossAmount,
+      platformFee,
+      alumniShare, // ✅ ADDED
       student: userId,
-      paymentMethod: paymentMethod || "upi",
-      paymentId: paymentId || null,
-      type: session.type,
+      paymentMethod: enrollmentData.paymentMethod,
+      paymentId: enrollmentData.paymentId,
+      type: session.type || "session",
     });
 
     res.json({
@@ -216,6 +232,7 @@ export const enrollSession = async (req, res) => {
       seatsLeft: session.totalSeats - session.enrolledStudents.length,
     });
   } catch (err) {
+    console.error("Enrollment error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -227,7 +244,7 @@ export const approveSession = async (req, res) => {
   try {
     const session = await Session.findByIdAndUpdate(
       req.params.id,
-      { status: "approved" },
+      { isApproved: true },
       { new: true }
     ).populate("instructor", "name email");
 
@@ -247,7 +264,6 @@ export const goLive = async (req, res) => {
     const session = await Session.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // Alumni can only go live for their own sessions
     const isOwner = session.instructor.toString() === req.user._id.toString();
     const isAdmin = req.user.role === "admin";
     if (!isOwner && !isAdmin) {

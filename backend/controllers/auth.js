@@ -227,7 +227,21 @@ export const login = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getMe = async (req, res) => {
   try {
-    const user = await findUserById(req.user._id);
+    let user = await findUserById(req.user._id);
+
+    if (user && user.role === "student") {
+      user = await Student.findById(req.user._id)
+        .select("-password")
+        .populate("enrolledCourses.course", "title price thumbnail")
+        .populate("enrolledSessions.session", "title date time")
+        .populate("connections", "name avatar college company title")
+        .populate("connectionRequests.alumni", "name avatar title");
+    } else if (user && user.role === "alumni") {
+      user = await Alumni.findById(req.user._id)
+        .select("-password")
+        .populate("connections", "name avatar college branch title")
+        .populate("connectionRequests.student", "name avatar title");
+    }
 
     res.json({ user });
   } catch (err) {

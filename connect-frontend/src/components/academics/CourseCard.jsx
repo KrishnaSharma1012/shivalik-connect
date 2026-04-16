@@ -8,8 +8,13 @@ const StarIcon = () => (
   </svg>
 );
 
+import { useAuth } from "../../context/AuthContext";
+import { isAcademicItemEnrolled } from "../../utils/academicCatalog";
+
 export function CourseCard({ course }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const enrolled = isAcademicItemEnrolled(course, user);
   const instructorLabel = typeof course.instructor === "string"
     ? course.instructor
     : course.instructor?.name || "Instructor";
@@ -25,6 +30,7 @@ export function CourseCard({ course }) {
         cursor: "pointer",
         transition: "all 0.22s",
         display: "flex", flexDirection: "column",
+        position: "relative",
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = "rgba(124,92,252,0.35)";
@@ -37,10 +43,19 @@ export function CourseCard({ course }) {
         e.currentTarget.style.boxShadow = "none";
       }}
     >
+      {enrolled && (
+        <div style={{
+          position: "absolute", top: 12, right: 12, zIndex: 5,
+          background: "rgba(0, 229, 195, 0.15)", color: "var(--teal)",
+          padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800,
+          border: "1px solid rgba(0, 229, 195, 0.3)", backdropFilter: "blur(4px)",
+        }}>ENROLLED</div>
+      )}
+
       {/* Color header bar */}
       <div style={{
         height: 6,
-        background: "linear-gradient(90deg, #7C5CFC, #FF7043)",
+        background: enrolled ? "linear-gradient(90deg, #00E5C3, #00B8A0)" : "linear-gradient(90deg, #7C5CFC, #FF7043)",
       }} />
 
       <div style={{ padding: "18px 18px 20px", display: "flex", flexDirection: "column", flex: 1 }}>
@@ -88,23 +103,24 @@ export function CourseCard({ course }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>
-              ₹{course.price.toLocaleString()}
+              {enrolled ? "Free Access" : `₹${course.price.toLocaleString()}`}
             </span>
           </div>
           <button
             onClick={e => { e.stopPropagation(); navigate("/course-detail", { state: { course } }); }}
             style={{
               padding: "8px 16px",
-              background: "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
-              border: "none", borderRadius: 10,
-              color: "white", fontSize: 13, fontWeight: 700,
+              background: enrolled ? "rgba(0, 229, 195, 0.1)" : "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
+              border: enrolled ? "1px solid rgba(0, 229, 195, 0.4)" : "none",
+              borderRadius: 10,
+              color: enrolled ? "var(--teal)" : "white", fontSize: 13, fontWeight: 700,
               fontFamily: "Plus Jakarta Sans", cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(124,92,252,0.3)",
+              boxShadow: enrolled ? "none" : "0 4px 14px rgba(124,92,252,0.3)",
               transition: "opacity 0.2s, transform 0.2s",
             }}
             onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
             onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-          >Enroll →</button>
+          >{enrolled ? "Open →" : "Enroll →"}</button>
         </div>
       </div>
     </div>
@@ -113,6 +129,8 @@ export function CourseCard({ course }) {
 
 export function SessionCard({ session }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const enrolled = isAcademicItemEnrolled(session, user);
   const isFull = session.seatsLeft === 0;
   const instructorLabel = typeof session.instructor === "string"
     ? session.instructor
@@ -127,12 +145,13 @@ export function SessionCard({ session }) {
       transition: "all 0.22s",
       display: "flex", flexDirection: "column",
       cursor: "pointer",
+      position: "relative",
     }}
     onClick={() => navigate("/session-workshop-detail", { state: { session } })}
     onMouseEnter={e => {
-      e.currentTarget.style.borderColor = "rgba(0,229,195,0.3)";
+      e.currentTarget.style.borderColor = enrolled ? "rgba(0,229,195,0.3)" : "rgba(124,92,252,0.3)";
       e.currentTarget.style.transform = "translateY(-2px)";
-      e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,229,195,0.1)";
+      e.currentTarget.style.boxShadow = enrolled ? "0 8px 28px rgba(0,229,195,0.15)" : "0 8px 28px rgba(124,92,252,0.1)";
     }}
     onMouseLeave={e => {
       e.currentTarget.style.borderColor = "var(--border)";
@@ -140,8 +159,17 @@ export function SessionCard({ session }) {
       e.currentTarget.style.boxShadow = "none";
     }}
     >
+      {enrolled && (
+        <div style={{
+          position: "absolute", top: 12, right: 12, zIndex: 5,
+          background: "rgba(0, 229, 195, 0.15)", color: "var(--teal)",
+          padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800,
+          border: "1px solid rgba(0, 229, 195, 0.3)", backdropFilter: "blur(4px)",
+        }}>JOINED</div>
+      )}
+
       {/* Teal header bar */}
-      <div style={{ height: 5, background: "linear-gradient(90deg, #00E5C3, #7C5CFC)" }} />
+      <div style={{ height: 5, background: enrolled ? "linear-gradient(90deg, #00E5C3, #00B8A0)" : "linear-gradient(90deg, #00E5C3, #7C5CFC)" }} />
 
       <div style={{ padding: "18px 18px 20px", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{
@@ -183,33 +211,33 @@ export function SessionCard({ session }) {
         {/* Price & CTA */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>
-            ₹{session.price.toLocaleString()}
+             {enrolled ? "Paid" : `₹${session.price.toLocaleString()}`}
           </span>
           <button
             onClick={e => {
               e.stopPropagation();
-              if (!isFull) {
-                navigate("/session-workshop-detail", { state: { session } });
-              }
+              navigate("/session-workshop-detail", { state: { session } });
             }}
-            disabled={isFull}
+            disabled={isFull && !enrolled}
             style={{
               padding: "8px 16px",
-              background: isFull
-                ? "var(--bg-4)"
-                : "linear-gradient(135deg, #00E5C3, #7C5CFC)",
-              border: isFull ? "1px solid var(--border)" : "none",
+              background: enrolled 
+                ? "rgba(0, 229, 195, 0.1)" 
+                : isFull 
+                  ? "var(--bg-4)" 
+                  : "linear-gradient(135deg, #00E5C3, #7C5CFC)",
+              border: enrolled ? "1px solid rgba(0, 229, 195, 0.4)" : isFull ? "1px solid var(--border)" : "none",
               borderRadius: 10,
-              color: isFull ? "var(--text-3)" : "white",
+              color: enrolled ? "var(--teal)" : isFull ? "var(--text-3)" : "white",
               fontSize: 13, fontWeight: 700, fontFamily: "Plus Jakarta Sans",
-              cursor: isFull ? "not-allowed" : "pointer",
-              boxShadow: isFull ? "none" : "0 4px 14px rgba(0,229,195,0.2)",
+              cursor: isFull && !enrolled ? "not-allowed" : "pointer",
+              boxShadow: enrolled || isFull ? "none" : "0 4px 14px rgba(0,229,195,0.2)",
               transition: "opacity 0.2s",
             }}
-            onMouseEnter={e => { if (!isFull) e.currentTarget.style.opacity = "0.85"; }}
+            onMouseEnter={e => { if (!isFull || enrolled) e.currentTarget.style.opacity = "0.85"; }}
             onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           >
-            {isFull ? "Full" : "Join Session →"}
+            {enrolled ? "Open →" : isFull ? "Full" : "Join →"}
           </button>
         </div>
       </div>

@@ -63,12 +63,15 @@ const Badge = ({ children, tone = "purple" }) => {
   );
 };
 
+import { useAuth } from "../../context/AuthContext";
+
 export default function SessionWorkshopDetails() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const session = state?.session || state?.item || state?.workshop;
   const [openPayment, setOpenPayment] = useState(Boolean(state?.openPayment));
-  const isEnrolled = isAcademicItemEnrolled(session);
+  const isEnrolled = isAcademicItemEnrolled(session, user);
 
   if (!session) {
     return (

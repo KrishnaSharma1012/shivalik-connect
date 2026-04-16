@@ -7,16 +7,33 @@ import Stats from "../../components/profile/Stats";
 import Modal from "../../components/common/Modal";
 import { useAuth } from "../../context/AuthContext";
 
-const stats = [
-  { label: "Connections",       value: 25  },
-  { label: "Courses Enrolled",  value: 4   },
-  { label: "Sessions Attended", value: 10  },
-  { label: "Mentors Connected", value: 8   },
-];
+const ListItem = ({ title, subtitle, tag, tagColor }) => (
+  <div style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-3)", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{title}</div>
+      <div style={{ fontSize: 12, color: "var(--text-3)" }}>{subtitle}</div>
+    </div>
+    {tag && (
+      <span style={{ fontSize: 11, fontWeight: 700, color: tagColor || "var(--text-3)", background: "rgba(255,255,255,0)", border: `1px solid ${tagColor || "var(--border)"}`, borderRadius: 99, padding: "3px 8px" }}>
+        {tag}
+      </span>
+    )}
+  </div>
+);
 
 export default function StudentProfile() {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const pendingRequests = user?.connectionRequests?.filter(r => r.status === 'pending') || [];
+  const resolvedRequests = user?.connectionRequests?.filter(r => r.status !== 'pending') || [];
+
+  const stats = [
+    { label: "Connections",       value: user?.connections?.length || 0  },
+    { label: "Courses Enrolled",  value: user?.enrolledCourses?.length || 0   },
+    { label: "Sessions Attended", value: user?.enrolledSessions?.length || 0  },
+    { label: "Pending Requests",  value: pendingRequests.length  },
+  ];
+
   const [open, setOpen] = useState(false);
   const [membershipModalOpen, setMembershipModalOpen] = useState(false);
   const activeMembershipList = user?.activeMembershipList || [
@@ -63,6 +80,54 @@ export default function StudentProfile() {
         />
 
         <Stats stats={stats} />
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          {/* Enrolled Courses */}
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Enrolled Courses</h3>
+            {user?.enrolledCourses?.length > 0 ? user.enrolledCourses.map((ec, i) => (
+              <ListItem key={i} title={ec.course?.title || "Unknown Course"} subtitle={`Enrolled: ${new Date(ec.enrolledAt).toLocaleDateString()}`} />
+            )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No enrolled courses.</p>}
+          </div>
+
+          {/* Enrolled Sessions */}
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Enrolled Sessions</h3>
+            {user?.enrolledSessions?.length > 0 ? user.enrolledSessions.map((es, i) => (
+              <ListItem key={i} title={es.session?.title || "Unknown Session"} subtitle={`Date: ${es.session?.date ? new Date(es.session.date).toLocaleDateString() : 'TBD'}`} />
+            )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No enrolled sessions.</p>}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          {/* Connections */}
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Connections ({user?.connections?.length || 0})</h3>
+            {user?.connections?.length > 0 ? user.connections.map((c, i) => (
+              <ListItem key={i} title={c.name} subtitle={`${c.title || ""} at ${c.company || ""}`} />
+            )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No connections yet.</p>}
+          </div>
+
+          {/* Connection Requests */}
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Connection Requests</h3>
+            {pendingRequests.length > 0 && <div>
+              <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 8 }}>Pending</h4>
+              {pendingRequests.map((r, i) => (
+                <ListItem key={`p${i}`} title={r.alumni?.name || "Unknown Alumni"} subtitle="Waiting for approval" tag="Pending" tagColor="#F5C842" />
+              ))}
+            </div>}
+            {resolvedRequests.length > 0 && <div style={{ marginTop: 12 }}>
+              <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 8 }}>Resolved</h4>
+              {resolvedRequests.map((r, i) => (
+                <ListItem key={`r${i}`} title={r.alumni?.name || "Unknown Alumni"} subtitle={`Status: ${r.status}`} tag={r.status} tagColor={r.status === 'accepted' ? '#10B981' : '#EF4444'} />
+              ))}
+            </div>}
+            {(pendingRequests.length === 0 && resolvedRequests.length === 0) && (
+              <p style={{ fontSize: 13, color: "var(--text-3)" }}>No connection requests.</p>
+            )}
+          </div>
+        </div>
 
         <div style={{
           padding: "20px 22px",
