@@ -14,7 +14,7 @@ let db;
 async function connectDB() {
   const client = new MongoClient(process.env.MONGO_URI);
   await client.connect();
-  db = client.db("connect_platform");
+  db = client.db("test");
   console.log("✅ MongoDB connected");
 }
 connectDB().catch(console.error);
@@ -119,11 +119,11 @@ async function queryDB(intent, message) {
       // Fix: match any company name after "from" or "at" regardless of case or suffix
       const compMatch  = message.match(/(?:from|at)\s+([a-zA-Z][a-zA-Z0-9\s&.,'-]{1,40}?)(?:\s*$|\s+(?:and|or|who|with)\b)/i);
       const query = {};
-      if (skillMatch) query.skills  = { $regex: skillMatch[1].trim(), $options: "i" };
+      if (skillMatch) query.domain  = { $regex: skillMatch[1].trim(), $options: "i" };
       if (compMatch)  query.company = { $regex: compMatch[1].trim(),  $options: "i" };
 
-      const alumni = await db.collection("alumni")
-        .find(query, { projection: { _id: 0, name: 1, company: 1, role: 1, skills: 1, premium: 1 } })
+      const alumni = await db.collection("alumnis")
+        .find(query, { projection: { _id: 0, name: 1, company: 1, job_profile: 1, domain: 1, city: 1, college: 1, branch: 1 } })
         .limit(5).toArray();
       // Always return a result object so the LLM gets explicit DB feedback (empty or not)
       return { type: "alumni", data: alumni };
