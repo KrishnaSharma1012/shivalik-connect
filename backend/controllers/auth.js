@@ -1,6 +1,8 @@
 import Student from '../models/Student.js';
 import Alumni from '../models/Alumni.js';
 import Admin from '../models/Admin.js';
+import Course from '../models/Course.js';
+import Session from '../models/Session.js';
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import {

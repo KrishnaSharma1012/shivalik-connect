@@ -47,29 +47,34 @@ export const DEFAULT_COURSES = [
     isCollegePartner: true,
     syllabus: [
       { 
-        week: "Week 1", topic: "Firebase Architecture & Setup", 
-        video: { url: "https://res.cloudinary.com/demo/video/upload/dog.mp4", duration: "12:45" } 
+        week: "Lecture 1", topic: "What is Firebase & Setup", 
+        video: { url: "https://www.youtube.com/embed/O17OWywmsHE", duration: "12:45" } 
       },
       { 
-        week: "Week 2", topic: "Firestore Real-time Database", 
-        video: { url: "https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4", duration: "15:20" } 
+        week: "Lecture 2", topic: "Firebase Authentication", 
+        video: { url: "https://www.youtube.com/embed/8sGY55yxicA", duration: "15:20" } 
       },
       { 
-        week: "Week 3", topic: "Firebase Authentication (Email/Google)", 
-        video: { url: "https://res.cloudinary.com/demo/video/upload/v1619001362/samples/elephants.mp4", duration: "18:10" } 
-      },
-       { 
-        week: "Week 4", topic: "Cloud Functions & Storage", 
-        video: { url: "https://res.cloudinary.com/demo/video/upload/sea_turtle.mp4", duration: "14:30" } 
+        week: "Lecture 3", topic: "Cloud Firestore Real-time Database", 
+        video: { url: "https://www.youtube.com/embed/QcsAb2RR52c", duration: "18:10" } 
       },
       { 
-        week: "Week 5", topic: "Hosting & Deployment Guide", 
-        video: { url: "https://res.cloudinary.com/demo/video/upload/dog.mp4", duration: "10:15" } 
+        week: "Lecture 4", topic: "Cloud Storage for Firebase", 
+        video: { url: "https://www.youtube.com/embed/SpxHVrpfGgU", duration: "14:30" } 
+      },
+      { 
+        week: "Lecture 5", topic: "Cloud Functions", 
+        video: { url: "https://www.youtube.com/embed/vr0Gfvp5v1A", duration: "10:15" } 
+      },
+      { 
+        week: "Lecture 6", topic: "Firebase Hosting & Deployment", 
+        video: { url: "https://www.youtube.com/embed/jsRVHeQd5kU", duration: "08:45" } 
       }
     ],
     assignments: [
-      { title: "Assignment 1: Data Modeling", description: "Design a Firestore schema for a Social Media app.", dueDate: "2026-05-10", marks: 100 },
-      { title: "Assignment 2: Cloud Triggers", description: "Create a function that sends email on user signup.", dueDate: "2026-05-20", marks: 100 }
+      { title: "Assignment 1: Data Modeling", description: "Design a Firestore schema for a Social Media app, including Users, Posts, and Comments collections.", dueDate: "2026-05-10", marks: 100 },
+      { title: "Assignment 2: Auth Integration", description: "Implement Google and Email/Password sign-in using Firebase Authentication.", dueDate: "2026-05-15", marks: 100 },
+      { title: "Assignment 3: Cloud Triggers", description: "Create a Cloud Function that automatically sends a welcome email on new user signup.", dueDate: "2026-05-20", marks: 100 }
     ]
   },
 ];

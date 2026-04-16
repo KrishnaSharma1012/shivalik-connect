@@ -102,8 +102,8 @@ function LearningSection({ title, items, onOpen }) {
         <p style={{ fontSize: 13, color: "var(--text-3)" }}>No enrolled {title.toLowerCase()}.</p>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          {items.map(item => (
-            <div key={item.key} style={{ display: "grid", gridTemplateColumns: "110px 1fr auto", gap: 14, alignItems: "center", padding: 14, borderRadius: 14, background: "var(--bg-4)", border: "1px solid var(--border)" }}>
+          {items.map((item, idx) => (
+            <div key={item._id || item.id || idx} style={{ display: "grid", gridTemplateColumns: "110px 1fr auto", gap: 14, alignItems: "center", padding: 14, borderRadius: 14, background: "var(--bg-4)", border: "1px solid var(--border)" }}>
               <div style={{ borderRadius: 12, overflow: "hidden", background: "var(--bg-2)", border: "1px solid var(--border)" }}>
                 <img
                   src={item.thumbnail || courseThumbnail}

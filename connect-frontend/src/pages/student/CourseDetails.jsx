@@ -22,26 +22,7 @@ const OUTCOMES = [
   "Lifetime access to recordings and materials",
 ];
 
-const REVIEWS = [
-  {
-    name: "Aarav Singh",
-    role: "Student, CSE 2026",
-    rating: 5,
-    text: "Very structured and practical. The mock interviews made a real difference in my prep.",
-  },
-  {
-    name: "Meera Iyer",
-    role: "Placed at Amazon",
-    rating: 5,
-    text: "The course content is concise but complete. The system design breakdown was especially strong.",
-  },
-  {
-    name: "Kabir Malhotra",
-    role: "Final Year Student",
-    rating: 4,
-    text: "Clear explanations and useful examples. The live sessions were the best part for me.",
-  },
-];
+
 
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -201,7 +182,6 @@ export default function CourseDetail() {
               <div style={{ flex: 1 }}>
                 <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{course?.instructor?.name || course?.instructor || "Verified Mentor"}</p>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {course?.rating && <span style={{ fontSize: 12, color: "#F5C842" }}>★ {course?.rating?.average || course?.rating}</span>}
                   {course?.students && <span style={{ fontSize: 12, color: "var(--text-3)" }}>{course?.studentsCount || course?.students || 0} students</span>}
                 </div>
               </div>
@@ -309,7 +289,19 @@ export default function CourseDetail() {
                 <div key={`${row.week}-${index}`} style={{ padding: 14, borderRadius: 14, background: "var(--bg-4)", border: "1px solid var(--border)" }}>
                   <p style={{ fontSize: 12, color: "var(--purple-light)", fontWeight: 700, marginBottom: 4 }}>{row.week}</p>
                   <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 10 }}>{row.topic}</p>
-                  <video src={row.video.url} controls style={{ width: "100%", display: "block", borderRadius: 12 }} />
+                  {row.video.url && (row.video.url.includes("youtube.com") || row.video.url.includes("youtu.be")) ? (
+                    <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", borderRadius: 12, background: "var(--bg-2)" }}>
+                      <iframe 
+                        src={row.video.url.includes("youtube.com/embed") ? row.video.url : row.video.url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")} 
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }} 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowFullScreen 
+                        title={row.topic}
+                      />
+                    </div>
+                  ) : (
+                    <video src={row.video.url} controls style={{ width: "100%", display: "block", borderRadius: 12 }} />
+                  )}
                 </div>
               ))}
             </div>
@@ -396,51 +388,6 @@ export default function CourseDetail() {
           </div>
         </div>
 
-        {/* Reviews */}
-        <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", marginTop: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-            <div>
-              <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 4 }}>Reviews</h2>
-              <p style={{ fontSize: 13, color: "var(--text-3)" }}>What students are saying about this course</p>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#F5C842" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <StarIcon />
-                <StarIcon />
-                <StarIcon />
-                <StarIcon />
-                <StarIcon />
-              </span>
-              <span style={{ fontSize: 13, color: "var(--text-2)", fontWeight: 700 }}>4.9 / 5</span>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 12 }}>
-            {REVIEWS.map((review, index) => (
-              <div key={index} style={{
-                padding: "16px 16px 15px",
-                borderRadius: 14,
-                background: "var(--bg-4)",
-                border: "1px solid var(--border)",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-                  <div>
-                    <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2 }}>{review.name}</p>
-                    <p style={{ fontSize: 12, color: "var(--text-3)" }}>{review.role}</p>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 2, color: "#F5C842", flexShrink: 0 }}>
-                    {Array.from({ length: 5 }).map((_, starIndex) => (
-                      <StarIcon key={starIndex} filled={starIndex < review.rating} />
-                    ))}
-                  </div>
-                </div>
-                <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.65 }}>
-                  {review.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       <PaymentModal isOpen={open} onClose={() => setOpen(false)} course={course} />
