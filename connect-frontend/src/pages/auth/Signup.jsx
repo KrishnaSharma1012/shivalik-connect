@@ -7,13 +7,45 @@ import axios from "axios";
 import API from "../../utils/api";
 import CrownIcon from "../../components/common/CrownIcon";
 
-// ─── Allowed college domains (mirrors backend list) ──────────────────────────
-const ALLOWED_DOMAINS = [
-  "shivalik.edu",
-  "shivalik.ac.in",
-  "shivalikgroup.edu.in",
-  "student.shivalik.edu",
-];
+// ─── Technical Colleges List (BTech / BCA) ──────────────────────────────────
+const TECHNICAL_COLLEGES = [
+  "Indian Institute of Technology (IIT) Bombay",
+  "Indian Institute of Technology (IIT) Delhi",
+  "Indian Institute of Technology (IIT) Kanpur",
+  "Indian Institute of Technology (IIT) Madras",
+  "Indian Institute of Technology (IIT) Kharagpur",
+  "Indian Institute of Technology (IIT) Roorkee",
+  "Indian Institute of Technology (IIT) Guwahati",
+  "National Institute of Technology (NIT) Trichy",
+  "National Institute of Technology (NIT) Surathkal",
+  "National Institute of Technology (NIT) Warangal",
+  "Vellore Institute of Technology (VIT)",
+  "Birla Institute of Technology and Science (BITS) Pilani",
+  "Delhi Technological University (DTU)",
+  "Netaji Subhas University of Technology (NSUT)",
+  "Indraprastha Institute of Information Technology (IIIT) Delhi",
+  "International Institute of Information Technology (IIIT) Hyderabad",
+  "Shivalik College of Engineering, Dehradun",
+  "Ajay Kumar Garg Engineering College (AKGEC), Ghaziabad",
+  "SRM Institute of Science and Technology",
+  "Manipal Institute of Technology",
+  "RV College of Engineering (RVCE), Bangalore",
+  "BMS College of Engineering, Bangalore",
+  "College of Engineering, Pune (COEP)",
+  "Jadavpur University, Kolkata",
+  "Punjab Engineering College (PEC)",
+  "Thapar Institute of Engineering and Technology",
+  "Kalinga Institute of Industrial Technology (KIIT)",
+  "Amity University",
+  "Chandigarh University",
+  "Lovely Professional University (LPU)",
+  "Jaypee Institute of Information Technology (JIIT)",
+  "Harcourt Butler Technical University (HBTU), Kanpur",
+  "Institute of Engineering and Technology (IET), Lucknow",
+  "Graphic Era University, Dehradun",
+  "University of Petroleum and Energy Studies (UPES), Dehradun",
+  "Other"
+].sort();
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 const EyeIcon = ({ open }) => (
@@ -112,10 +144,9 @@ export default function Signup() {
   const strengthColors = ["", "var(--danger)", "var(--orange)", "var(--purple-light)", "var(--teal)"];
   const strengthLabels = ["", "Weak", "Fair", "Good", "Strong"];
 
-  // ── Domain validation helper ──
+  // ── Email Validation (Regex) ──
   const isValidStudentEmail = (email) => {
-    const domain = email.split("@")[1]?.toLowerCase();
-    return domain && ALLOWED_DOMAINS.includes(domain);
+    return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   // ── Start resend countdown ──
@@ -151,6 +182,12 @@ export default function Signup() {
       }
       if (form.password !== form.confirmPassword) { setError("Passwords don't match"); return; }
       if (strength < 2) { setError("Password is too weak"); return; }
+      
+      // Validate email format
+      if (!isValidStudentEmail(form.email)) {
+        setError(`Please enter a valid email address.`);
+        return;
+      }
       setError("");
 
       if (form.role === "student") {
@@ -428,27 +465,22 @@ export default function Signup() {
                   <input type="email" className="dark-input"
                     placeholder={form.role === "student" ? "you@shivalik.ac.in" : "you@email.com"}
                     value={form.email} onChange={e => set("email", e.target.value)}
-                    style={{
-                      borderColor: form.email && form.role === "student"
-                        ? isValidStudentEmail(form.email) ? "rgba(0,229,195,0.4)" : "rgba(255,75,110,0.4)"
-                        : undefined,
-                    }}
                   />
-                  {form.email && form.role === "student" && (
-                    <p style={{ fontSize: 11, marginTop: 4, color: isValidStudentEmail(form.email) ? "var(--teal)" : "var(--danger)" }}>
-                      {isValidStudentEmail(form.email) ? "✓ Valid college email" : "Only college emails are allowed"}
-                    </p>
-                  )}
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
                     {form.role === "student" ? "College Name" : "Current Company"}
                   </label>
-                  <input className="dark-input"
-                    placeholder={form.role === "student" ? "e.g. Shivalik College of Engineering" : "e.g. Google, Amazon…"}
+                  <input className="dark-input" list="collegeList"
+                    placeholder={form.role === "student" ? "Search or enter your college" : "e.g. Google, Amazon…"}
                     value={form.role === "student" ? form.college : form.company}
                     onChange={e => set(form.role === "student" ? "college" : "company", e.target.value)} />
+                  <datalist id="collegeList">
+                    {TECHNICAL_COLLEGES.map((col, idx) => (
+                      <option key={idx} value={col} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>

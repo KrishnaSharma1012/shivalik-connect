@@ -1,19 +1,6 @@
-
 import BaseUser from "../models/BaseUser.js";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
-
-// ─────────────────────────────────────────────
-// ALLOWED COLLEGE EMAIL DOMAINS
-// Add your college's email domain(s) here
-// ─────────────────────────────────────────────
-const ALLOWED_STUDENT_DOMAINS = [
-  "shivalik.edu",
-  "shivalik.ac.in",
-  "shivalikgroup.edu.in",
-  "student.shivalik.edu",
-  // Add more college domains here as needed
-];
 
 // ─────────────────────────────────────────────
 // IN-MEMORY OTP STORE (expires after 10 min)
@@ -21,17 +8,8 @@ const ALLOWED_STUDENT_DOMAINS = [
 const otpStore = new Map(); // email -> { otp, expiresAt }
 
 // ─────────────────────────────────────────────
-// EMAIL TRANSPORTER
+// EMAIL TRANSPORTER IS INSTANTIATED PER REQUEST
 // ─────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 // ─────────────────────────────────────────────
 // GENERATE TOKEN
 // ─────────────────────────────────────────────
@@ -52,16 +30,6 @@ const generateToken = (userId) => {
 export const signup = async (req, res) => {
   try {
     const { name, email, password, role, college, company, alumniPlan } = req.body;
-
-    // ✅ For students: enforce college email domain
-    if (role === "student" || !role) {
-      const emailDomain = email.split("@")[1]?.toLowerCase();
-      if (!emailDomain || !ALLOWED_STUDENT_DOMAINS.includes(emailDomain)) {
-        return res.status(400).json({
-          message: `Only college emails are allowed for student registration. Accepted domains: ${ALLOWED_STUDENT_DOMAINS.join(", ")}`
-        });
-      }
-    }
 
     // 🔍 check existing user
     const existingUser = await BaseUser.findOne({ email });
@@ -98,20 +66,22 @@ export const sendOTP = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
 
-    // Validate domain for students
-    const emailDomain = email.split("@")[1]?.toLowerCase();
-    if (!emailDomain || !ALLOWED_STUDENT_DOMAINS.includes(emailDomain)) {
-      return res.status(400).json({
-        message: `Only college emails are allowed. Accepted domains: ${ALLOWED_STUDENT_DOMAINS.join(", ")}`
-      });
-    }
-
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(email.toLowerCase(), { otp, expiresAt });
 
     // Send email
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
     await transporter.sendMail({
       from: `"Connect Platform" <${process.env.EMAIL_USER}>`,
       to: email,
