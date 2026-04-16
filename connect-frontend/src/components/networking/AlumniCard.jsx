@@ -16,10 +16,12 @@ const companies = {
 export default function AlumniCard({ alumni }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState("connect");
+  const [statusLoading, setStatusLoading] = useState(true);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
+      setStatusLoading(true);
       try {
         const id = alumni._id || alumni.id;
         if (!id) return;
@@ -30,6 +32,8 @@ export default function AlumniCard({ alumni }) {
         else setStatus(res.data.status);
       } catch (err) {
         console.error(err);
+      } finally {
+        setStatusLoading(false);
       }
     };
     checkStatus();
@@ -126,10 +130,11 @@ export default function AlumniCard({ alumni }) {
 
         <button
           onClick={handleConnect}
+          disabled={statusLoading || loading || status !== "connect"}
           style={{
             padding: "7px 14px", borderRadius: 9,
             border: "none", fontSize: 12, fontWeight: 700,
-            fontFamily: "Plus Jakarta Sans", cursor: "pointer",
+            fontFamily: "Plus Jakarta Sans", cursor: statusLoading || loading || status !== "connect" ? "not-allowed" : "pointer",
             transition: "all 0.2s",
             background:
               status === "connect"   ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)" :
@@ -147,7 +152,8 @@ export default function AlumniCard({ alumni }) {
               status === "connect" ? "0 4px 14px rgba(124,92,252,0.3)" : "none",
           }}
         >
-          {status === "connect"   ? "Connect"   :
+          {statusLoading ? "Checking..." :
+           status === "connect"   ? "Connect"   :
            status === "pending"   ? "Pending…"  :
            "✓ Connected"}
         </button>

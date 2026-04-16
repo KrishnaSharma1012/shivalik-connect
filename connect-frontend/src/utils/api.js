@@ -16,5 +16,17 @@ API.interceptors.request.use((req) => {
   return req;
 });
 
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("user");
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ✅ VERY IMPORTANT (THIS WAS MISSING)
 export default API;

@@ -2,12 +2,16 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const token = localStorage.getItem("token");
 
-  // fallback for refresh / async issue
-  const storedUser = localStorage.getItem("user");
+  if (loading) return null;
 
-  if (!user && !storedUser) {
+  if (!user && !token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user && token) {
     return <Navigate to="/login" replace />;
   }
 

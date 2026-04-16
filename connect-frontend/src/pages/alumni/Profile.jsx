@@ -4,6 +4,7 @@ import ProfileCard from "../../components/profile/ProfileCard";
 import EditProfile from "../../components/profile/EditProfile";
 import Stats from "../../components/profile/Stats";
 import Modal from "../../components/common/Modal";
+import Loader from "../../components/common/Loader";
 import PostCard from "../../components/feed/PostCard";
 import API from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
@@ -101,7 +102,7 @@ function AlumniProfile() {
           </h2>
 
           {loading ? (
-            <p style={{ color: "var(--text-3)", textAlign: "center" }}>Loading posts...</p>
+            <Loader text="Loading posts..." />
           ) : posts.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px 20px", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 14 }}>
               <p style={{ fontSize: 14, color: "var(--text-3)", margin: 0 }}>No posts found for your profile yet.</p>

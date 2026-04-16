@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
+import Loader from "../../../components/common/Loader";
 import { useAuth } from "../../../context/AuthContext";
 
 /* ── Icons ── */
@@ -62,6 +63,8 @@ export default function AlumniMessages() {
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [input, setInput] = useState("");
   const bottomRef = useRef();
 
@@ -72,6 +75,7 @@ export default function AlumniMessages() {
   }, [location.search]);
 
   const fetchConversations = async () => {
+    setConversationsLoading(true);
     try {
       const res = await API.get("/messages/conversations");
       const fetched = res.data.conversations || [];
@@ -106,6 +110,8 @@ export default function AlumniMessages() {
        console.error(err);
        setConversations([]);
        setActiveChat(null);
+    } finally {
+      setConversationsLoading(false);
     }
   };
 
@@ -114,6 +120,7 @@ export default function AlumniMessages() {
   }, [activeChat]);
 
   const fetchMessages = async (userId) => {
+    setMessagesLoading(true);
     try {
       const res = await API.get(`/messages/${userId}`);
       const fetched = res.data.messages || [];
@@ -126,6 +133,8 @@ export default function AlumniMessages() {
     } catch(err) { 
       console.error(err);
       setMessages([]);
+    } finally {
+      setMessagesLoading(false);
     }
   };
 
@@ -168,6 +177,8 @@ export default function AlumniMessages() {
           </div>
 
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {conversationsLoading && <Loader text="Loading conversations..." />}
+
             {!hasActiveMembership && (
               <div style={{ margin: "8px 10px", padding: "7px 10px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
                 <p style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5, margin: 0 }}>
@@ -176,7 +187,7 @@ export default function AlumniMessages() {
               </div>
             )}
 
-            {hasActiveMembership && (
+            {hasActiveMembership && !conversationsLoading && (
               <>
                 {/* ACTIVE MEMBERSHIP section header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 6px", borderBottom: "1px solid var(--border)" }}>
@@ -206,7 +217,8 @@ export default function AlumniMessages() {
             )}
 
             {/* BASIC section header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 6px", borderBottom: "1px solid var(--border)", borderTop: "1px solid var(--border)", marginTop: 4 }}>
+            {!conversationsLoading && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 6px", borderBottom: "1px solid var(--border)", borderTop: "1px solid var(--border)", marginTop: 4 }}>
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-3)" }}>Basic</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "var(--text-3)" }}>Free students</span>
@@ -214,9 +226,10 @@ export default function AlumniMessages() {
                   <span style={{ background: "var(--purple)", color: "white", borderRadius: 99, fontSize: 9, fontWeight: 700, padding: "1px 5px" }}>{totalBasicUnread}</span>
                 )}
               </div>
-            </div>
+              </div>
+            )}
 
-            {basicChats.map(chat => (
+            {!conversationsLoading && basicChats.map(chat => (
               <ConversationItem key={chat.id} chat={chat} active={activeChat?.id === chat.id} onClick={setActiveChat} />
             ))}
           </div>
@@ -254,6 +267,8 @@ export default function AlumniMessages() {
 
             {/* Messages */}
             <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {messagesLoading && <Loader text="Loading messages..." />}
+
               {currentMsgs.map((msg, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: msg.sender === "me" ? "flex-end" : "flex-start" }}>
                   <div style={{ maxWidth: "68%", padding: "10px 14px", borderRadius: msg.sender === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.sender === "me" ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)" : "var(--bg-4)", border: msg.sender === "me" ? "none" : "1px solid var(--border)", color: msg.sender === "me" ? "white" : "var(--text)", fontSize: 14, lineHeight: 1.5 }}>
