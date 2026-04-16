@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
+import Loader from "../../../components/common/Loader";
 import API from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -194,6 +195,29 @@ function MyPostCard({ post, onDelete, onUpdated }) {
           </p>
         )}
 
+        {/* Media */}
+        {(Array.isArray(post.media) ? post.media.length > 0 : Boolean(post.image)) && !editing && (
+          <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+            {(Array.isArray(post.media) ? post.media : [{ url: post.image, type: "image" }]).filter(item => item?.url).map((item, index) => (
+              <div key={`${item.url}-${index}`} style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", background: "var(--bg-4)" }}>
+                {item.type === "video" ? (
+                  <video
+                    controls
+                    src={item.url}
+                    style={{ width: "100%", display: "block", maxHeight: 360, objectFit: "cover" }}
+                  />
+                ) : (
+                  <img
+                    src={item.url}
+                    alt="Post media"
+                    style={{ width: "100%", display: "block", maxHeight: 420, objectFit: "cover" }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Actions */}
         <div style={{ display: "flex", gap: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
           <button
@@ -306,11 +330,7 @@ export default function MyPosts() {
           </p>
         </div>
 
-        {loading && (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-3)" }}>
-            Loading posts…
-          </div>
-        )}
+        {loading && <Loader text="Loading posts..." />}
 
         {!loading && posts.length === 0 && (
           <div style={{
