@@ -7,8 +7,8 @@ export async function getPosts() {
 }
 
 // ➕ Create post
-export async function createPost(content) {
-  const res = await API.post("/posts", { content });
+export async function createPost(content, media = []) {
+  const res = await API.post("/posts", { content, media });
   return res.data;
 }
 
@@ -16,4 +16,4 @@ export async function createPost(content) {
 export async function likePost(postId) {
   const res = await API.post(`/posts/${postId}/like`);
   return res.data;
-}
+}

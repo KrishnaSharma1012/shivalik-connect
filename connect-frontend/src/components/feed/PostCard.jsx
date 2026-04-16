@@ -145,13 +145,14 @@ export default function PostCard({ post, onOpenProfile }) {
   const handleComment = async () => {
     if (!comment.trim()) return;
     const textToSend = comment;
-    if (post._id) {
-      try {
-        const res = await import("../../utils/api").then(m => m.default.post(`/posts/${post._id}/comment`, { content: textToSend }));
-        setComments(prev => [...prev, res.data.comment]);
-        setComment("");
-        return;
-      } catch (err) { console.error(err); }
+    if (!post._id) return;
+    try {
+      const res = await import("../../utils/api").then(m => m.default.post(`/posts/${post._id}/comment`, { content: textToSend }));
+      setComments(prev => [...prev, res.data.comment]);
+      setComment("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to post comment. Please try again.");
     }
   };
 
@@ -161,7 +162,7 @@ export default function PostCard({ post, onOpenProfile }) {
 
   useEffect(() => {
     setMediaIndex(0);
-  }, [post.id]);
+  }, [post._id]);
 
   useEffect(() => {
     if (mediaIndex >= slides.length) {

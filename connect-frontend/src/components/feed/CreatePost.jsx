@@ -127,7 +127,10 @@ export default function CreatePost({ onAddPost }) {
     try {
       // Convert file objects to base64 so the backend can upload to Cloudinary
       const mediaBase64 = await Promise.all(
-        media.filter(m => m.file).map(m => toBase64(m.file))
+        media.filter(m => m.file).map(async (m) => ({
+          type: m.type,
+          data: await toBase64(m.file),
+        }))
       );
 
       await onAddPost({

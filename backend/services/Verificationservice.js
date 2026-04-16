@@ -23,28 +23,7 @@
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
-// bad-words supports both CommonJS and ESM. If your backend uses ESM, use:
-//   import { Filter } from 'bad-words';
-// For CommonJS:
-//   const { Filter } = require('bad-words');
-// The dynamic require below works in both environments.
-
-let Filter;
-try {
-  Filter = (await import('bad-words')).default;
-} catch {
-  // If static import is needed (CommonJS), swap to: const Filter = require('bad-words');
-  Filter = null;
-}
-
-let TfIdf;
-try {
-  TfIdf = (await import('natural')).TfIdf;
-} catch {
-  TfIdf = null;
-}
-
-// ─── Provider router ─────────────────────────────────────────────────────────
+// ── Provider router ────────────────────────────────────────────────────────────
 
 const MODERATION_PROVIDER    = process.env.MODERATION_PROVIDER    || 'badwords';
 const AI_DETECTION_PROVIDER  = process.env.AI_DETECTION_PROVIDER  || 'offline';
@@ -54,8 +33,15 @@ const AI_DETECTION_PROVIDER  = process.env.AI_DETECTION_PROVIDER  || 'offline';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── Adapter 1: bad-words (free, fully offline, no API key) ────────────────────
-function badwordsCheck(text) {
+async function badwordsCheck(text) {
   try {
+    let Filter;
+    try {
+      const mod = await import('bad-words');
+      Filter = mod.default || mod.Filter;
+    } catch {
+      return { passed: true, flags: [] }; // package not installed, fail open
+    }
     const filter = new Filter();
     const isProfane = filter.isProfane(text);
     return {
@@ -157,7 +143,7 @@ async function moderateContent(text) {
 
   if (MODERATION_PROVIDER === 'perspective') return perspectiveCheck(text);
   if (MODERATION_PROVIDER === 'openai')      return openaiModerationCheck(text);
-  return badwordsCheck(text); // default
+  return await badwordsCheck(text); // default
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
