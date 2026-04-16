@@ -10,6 +10,9 @@ const StarIcon = () => (
 
 export function CourseCard({ course }) {
   const navigate = useNavigate();
+  const instructorLabel = typeof course.instructor === "string"
+    ? course.instructor
+    : course.instructor?.name || "Instructor";
 
   return (
     <div
@@ -61,7 +64,7 @@ export function CourseCard({ course }) {
         }}>{course.title}</h3>
 
         <p style={{ fontSize: 13, color: "var(--purple-light)", marginBottom: 8, fontWeight: 500 }}>
-          by {course.instructor}
+          by {instructorLabel}
         </p>
 
         <p style={{
@@ -111,6 +114,9 @@ export function CourseCard({ course }) {
 export function SessionCard({ session }) {
   const navigate = useNavigate();
   const isFull = session.seatsLeft === 0;
+  const instructorLabel = typeof session.instructor === "string"
+    ? session.instructor
+    : session.instructor?.name || "Instructor";
 
   return (
     <div style={{
@@ -156,7 +162,7 @@ export function SessionCard({ session }) {
           {session.title}
         </h3>
         <p style={{ fontSize: 13, color: "var(--teal)", marginBottom: 8, fontWeight: 500 }}>
-          by {session.instructor}
+          by {instructorLabel}
         </p>
         <p style={{
           fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, marginBottom: 14, flex: 1,
