@@ -33,6 +33,19 @@ export default function AlumniFeed() {
   };
 
 
+  // const addPost = async (newPost) => {
+  //   try {
+  //     await API.post("/posts", {
+  //       content: newPost.content,
+  //       media: newPost.media || [],
+  //     });
+  //     fetchPosts();
+  //   } catch (err) {
+  //     console.error("Failed to create post:", err);
+  //     const errMsg = err?.response?.data?.message || err.message;
+  //     alert("Failed to post: " + errMsg);
+  //   }
+  // };
   const addPost = async (newPost) => {
     try {
       await API.post("/posts", {
@@ -41,9 +54,17 @@ export default function AlumniFeed() {
       });
       fetchPosts();
     } catch (err) {
-      console.error("Failed to create post:", err);
-      const errMsg = err?.response?.data?.message || err.message;
-      alert("Failed to post: " + errMsg);
+      const data = err?.response?.data;
+
+      // ── Show specific rejection reason ───────────────────────
+      if (err?.response?.status === 422) {
+        alert(
+          `❌ Post Rejected\n\n${data?.reason}\n\n` +
+          `Strikes: ${data?.strikes}/4 — repeated violations may restrict your account.`
+        );
+      } else {
+        alert("Failed to post: " + (data?.message || err.message));
+      }
     }
   };
 

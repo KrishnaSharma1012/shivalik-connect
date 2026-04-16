@@ -40,6 +40,30 @@ const postSchema = new mongoose.Schema(
     }],
 
     comments: [commentSchema],
+
+    // Add to your existing postSchema fields
+    verification: {
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      rejectionReason: { type: String, default: null },
+      checkedAt: { type: Date, default: null }
+    },
+
+    aiDetection: {
+      flag: {
+        type: String,
+        enum: ['human', 'ai_assisted', 'ai_generated'],
+        default: 'human'
+      },
+      score: { type: Number, default: 0 }
+    },
+
+    // Add to your User/Alumni model for strike tracking
+    strikes: { type: Number, default: 0 },
+    restrictedUntil: { type: Date, default: null },
   },
   { timestamps: true }
 );

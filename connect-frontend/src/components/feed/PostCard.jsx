@@ -1,5 +1,41 @@
 import React, { useEffect, useState } from "react";
 
+// ── Add this helper component at the top of PostCard.jsx ────
+const AIFlagBadge = ({ flag }) => {
+  if (!flag || flag === "human") return null;
+
+  const config = {
+    ai_assisted: {
+      label: "AI-Assisted",
+      emoji: "🟡",
+      color: "rgba(255, 193, 7, 0.15)",
+      border: "rgba(255, 193, 7, 0.35)",
+      text: "#FFC107",
+    },
+    ai_generated: {
+      label: "AI-Generated",
+      emoji: "🤖",
+      color: "rgba(255, 112, 67, 0.1)",
+      border: "rgba(255, 112, 67, 0.35)",
+      text: "#FF7043",
+    },
+  };
+
+  const c = config[flag];
+  if (!c) return null;
+
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "3px 10px", borderRadius: 999, fontSize: 11,
+      fontWeight: 600, fontFamily: "DM Sans",
+      background: c.color, border: `1px solid ${c.border}`, color: c.text,
+    }}>
+      {c.emoji} {c.label}
+    </span>
+  );
+};
+
 const HeartIcon = ({ filled }) => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"}
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -175,6 +211,7 @@ export default function PostCard({ post, onOpenProfile }) {
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{authorName}</span>
+            <AIFlagBadge flag={post.aiDetection?.flag} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
             <p style={{ fontSize: 12, color: "var(--text-3)" }}>{displayTime}</p>
