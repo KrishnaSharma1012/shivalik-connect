@@ -154,11 +154,6 @@ export default function Signup() {
       setError("");
 
       if (form.role === "student") {
-        // Validate college email domain first
-        if (!isValidStudentEmail(form.email)) {
-          setError(`Only college email addresses are allowed. Accepted domains: ${ALLOWED_DOMAINS.join(", ")}`);
-          return;
-        }
         // Send OTP and go to OTP step
         try {
           setLoading(true);
@@ -343,7 +338,7 @@ export default function Signup() {
                     value: "student", label: "Student",
                     desc: "Looking for mentorship, courses, and career guidance from alumni",
                     perks: ["Free to join", "Membership-based alumni access", "College partner discounts"],
-                    note: "⚠️ Requires official college email",
+                    note: "NOTE: Requires official college email",
                   },
                   {
                     value: "alumni", label: "Alumni",
@@ -387,7 +382,7 @@ export default function Signup() {
                       ))}
                     </div>
                     {r.note && (
-                      <p style={{ fontSize: 11, color: "var(--orange)", marginTop: 10, fontWeight: 600 }}>{r.note}</p>
+                      <p style={{ fontSize: 11, color: "var(--purple-light)", marginTop: 10, fontWeight: 500, padding: "8px 10px", background: "rgba(124,92,252,0.1)", border: "1px solid rgba(124,92,252,0.3)", borderRadius: 8 }}>{r.note}</p>
                     )}
                   </div>
                 ))}
@@ -411,12 +406,11 @@ export default function Signup() {
               {/* Student domain notice */}
               {form.role === "student" && (
                 <div style={{
-                  padding: "10px 14px", borderRadius: 10, marginBottom: 14,
-                  background: "rgba(124,92,252,0.08)", border: "1px solid rgba(124,92,252,0.25)",
-                  fontSize: 12, color: "var(--text-3)", lineHeight: 1.6,
+                  padding: "10px 14px", borderRadius: 8, marginBottom: 14,
+                  background: "rgba(124,92,252,0.1)", border: "1px solid rgba(124,92,252,0.3)",
+                  fontSize: 12, color: "var(--purple-light)", lineHeight: 1.6, fontWeight: 500,
                 }}>
-                  🎓 <strong style={{ color: "var(--purple-light)" }}>College email required.</strong>{" "}
-                  Use your official college email (e.g. <code style={{ color: "var(--teal)" }}>name@shivalik.ac.in</code>). A verification code will be sent.
+                  College email required. Use your official college email. A verification code will be sent.
                 </div>
               )}
 
@@ -442,7 +436,7 @@ export default function Signup() {
                   />
                   {form.email && form.role === "student" && (
                     <p style={{ fontSize: 11, marginTop: 4, color: isValidStudentEmail(form.email) ? "var(--teal)" : "var(--danger)" }}>
-                      {isValidStudentEmail(form.email) ? "✓ Valid college email" : `✗ Must use: ${ALLOWED_DOMAINS.join(", ")}`}
+                      {isValidStudentEmail(form.email) ? "✓ Valid college email" : "Only college emails are allowed"}
                     </p>
                   )}
                 </div>
