@@ -20,13 +20,8 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.1.1",
-<<<<<<< Updated upstream
-    "mongoose": "^9.4.1"
-=======
-    "mongoose": "^8.23.0",
+    "mongoose": "^9.4.1",
     "nodemailer": "^8.0.5"
->>>>>>> Stashed changes
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
