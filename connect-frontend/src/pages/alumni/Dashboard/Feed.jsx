@@ -4,7 +4,6 @@ import MainLayout from "../../../components/layout/MainLayout";
 import CreatePost from "../../../components/feed/CreatePost";
 import PostCard from "../../../components/feed/PostCard";
 import CrownIcon from "../../../components/common/CrownIcon";
-import PaymentModal from "../../../components/academics/PaymentModal";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
 
@@ -16,7 +15,6 @@ export default function AlumniFeed() {
   const navigate = useNavigate();
   const isPremium = user?.alumniPlan === "premium";
   const [posts, setPosts] = React.useState([]);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   React.useEffect(() => {
     fetchPosts();
@@ -47,15 +45,27 @@ export default function AlumniFeed() {
     }
   };
 
-  const handleGoPremium = () => {
-    setShowPaymentModal(true);
-  };
+  const handleGoPremium = async () => {
+    if (!user || user.role !== "alumni") {
+      navigate("/signup", { state: { role: "alumni", plan: "premium" } });
+      return;
+    }
 
-  const handlePaymentConfirm = () => {
-    setShowPaymentModal(false);
-
-    if (user?.role === "alumni") updateUser({ alumniPlan: "premium" });
-    else navigate("/signup", { state: { role: "alumni", plan: "premium" } });
+    try {
+      await updateUser({ alumniPlan: "premium" });
+      alert("🎉 You are now a Premium member!");
+      window.location.reload();
+    } catch (err1) {
+      console.error("Profile update failed, trying upgrade-plan endpoint", err1);
+      try {
+        await API.patch("/users/upgrade-plan", { plan: "premium" });
+        alert("🎉 You are now a Premium member!");
+        window.location.reload();
+      } catch (err2) {
+        console.error("Upgrade failed", err2);
+        alert("Upgrade failed. Please try again.");
+      }
+    }
   };
 
   return (
@@ -93,7 +103,7 @@ export default function AlumniFeed() {
               padding: "8px 16px", flexShrink: 0,
               background: "linear-gradient(135deg, #FF7043, #FF9A6C)", border: "none", borderRadius: 10,
               color: "white", fontSize: 12, fontWeight: 700, fontFamily: "Plus Jakarta Sans", cursor: "pointer",
-            }}>Go Premium →</button>
+            }}>Go Premium — ₹499 →</button>
           </div>
         )}
 
@@ -101,23 +111,12 @@ export default function AlumniFeed() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {posts.map((post, i) => (
-            <div key={post.id} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 60}ms` }}>
+            <div key={post._id || post.id || i} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 60}ms` }}>
               <PostCard post={post} />
             </div>
           ))}
         </div>
 
-        <PaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          course={{
-            title: "Alumni Premium Plan",
-            instructor: "Connect",
-            price: 999,
-          }}
-          skipEnrollment
-          onPaymentSuccess={handlePaymentConfirm}
-        />
       </div>
     </MainLayout>
   );

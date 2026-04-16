@@ -18,13 +18,17 @@ const router = express.Router();
 // PUBLIC
 // ─────────────────────────────
 router.get("/", getCourses);          // ✅ no need protect
-router.get("/:id", getCourseById);
 
 // ─────────────────────────────
 // ALUMNI (CREATE / MANAGE)
 // ─────────────────────────────
-router.get("/my", protect, roleGuard("alumni"), getMyCourses);
+router.get("/my", protect, roleGuard("alumni"), getMyCourses); // ✅ Must be before /:id
 router.post("/", protect, roleGuard("alumni"), createCourse);
+
+// ─────────────────────────────
+// PUBLIC (single item — must come after /my)
+// ─────────────────────────────
+router.get("/:id", getCourseById);
 
 router.put("/:id", protect, roleGuard("alumni", "admin"), updateCourse);
 router.delete("/:id", protect, roleGuard("alumni", "admin"), deleteCourse);

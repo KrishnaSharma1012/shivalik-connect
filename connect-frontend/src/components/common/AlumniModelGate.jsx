@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import PaymentModal from "../academics/PaymentModal";
 import CrownIcon from "./CrownIcon";
 
 // ── Layout constants — adjust to match your MainLayout ───────────────────────
@@ -12,7 +11,6 @@ const NAVBAR_HEIGHT = 64;
 export default function AlumniModelGate({ isPremium, children, featureName = "this feature" }) {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     if (isPremium) return;
@@ -48,17 +46,29 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
 
   if (isPremium) return children;
 
-  const handleUpgrade = () => {
-    setShowPaymentModal(true);
-  };
-
-  const handlePaymentConfirm = () => {
-    setShowPaymentModal(false);
-
-    if (user?.role === "alumni") {
-      updateUser({ alumniPlan: "premium" });
-    } else {
+  const handleUpgrade = async () => {
+    if (!user || user.role !== "alumni") {
       navigate("/signup", { state: { role: "alumni", plan: "premium" } });
+      return;
+    }
+
+    try {
+      // Try profile update first
+      await updateUser({ alumniPlan: "premium" });
+      alert("🎉 You are now a Premium member!");
+      window.location.reload();
+    } catch (err1) {
+      console.error("Profile update failed, trying upgrade-plan endpoint", err1);
+      try {
+        // Fallback to dedicated upgrade endpoint
+        const API = (await import("../../utils/api")).default;
+        await API.patch("/users/upgrade-plan", { plan: "premium" });
+        alert("🎉 You are now a Premium member!");
+        window.location.reload();
+      } catch (err2) {
+        console.error("Upgrade failed", err2);
+        alert("Upgrade failed. Please try again.");
+      }
     }
   };
 
@@ -162,22 +172,11 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
             onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
             onClick={handleUpgrade}
           >
-            Upgrade to Premium →
+            Upgrade to Premium — ₹499 →
           </button>
         </div>
       </div>
 
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        course={{
-          title: "Alumni Premium Plan",
-          instructor: "Connect",
-          price: 999,
-        }}
-        skipEnrollment
-        onPaymentSuccess={handlePaymentConfirm}
-      />
     </>
   );
 }

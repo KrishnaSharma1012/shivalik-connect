@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniModelGate from "../../../components/common/AlumniModelGate";
 import { useAuth } from "../../../context/AuthContext";
@@ -6,8 +6,10 @@ import { useNavigate } from "react-router-dom";
 import {
   combineDateTime,
   formatAcademicDate,
-  isItemLive
+  isItemLive,
+  createVideoEntry
 } from "../../../utils/academicCatalog";
+import courseThumbnail from "../../../assets/hero.png";
 import API from "../../../utils/api";
 import { DUMMY_MY_SESSIONS } from "../../../utils/mockData";
 
@@ -648,7 +650,7 @@ function SubmitBtn({ label, onClick, disabled }) {
 // ─────────────────────────────────────────────
 // SESSION CARD
 // ─────────────────────────────────────────────
-function SessionCard({ s, i }) {
+function SessionCard({ s, i, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
   const pct = Math.round((s.enrolled / s.totalSeats) * 100);
@@ -728,7 +730,7 @@ function SessionCard({ s, i }) {
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12, gap: 10 }}>
           <button
-            onClick={() => handleDelete(s)}
+            onClick={(e) => { e.stopPropagation(); onDelete(s); }}
             style={{
               padding: "8px 12px",
               borderRadius: 11,
@@ -1167,7 +1169,7 @@ export default function Sessions() {
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16, alignItems: "stretch" }}>
-              {sessions.map((s, i) => <SessionCard key={s.id} s={s} i={i} />)}
+              {sessions.map((s, i) => <SessionCard key={s.id || s._id || i} s={s} i={i} onDelete={handleDelete} />)}
             </div>
           )}
 

@@ -142,6 +142,11 @@ export default function AlumniMembershipPage() {
   const { user } = useAuth();
   const isPremium = user?.alumniPlan === "premium";
 
+  // Hooks must always be called before any conditional returns
+  const [membershipActive, setMembershipActive] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
   if (!isPremium) {
     return (
       <MainLayout>
@@ -181,10 +186,6 @@ export default function AlumniMembershipPage() {
       </MainLayout>
     );
   }
-
-  const [membershipActive, setMembershipActive] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   // Mock data for when membership is active
   const membershipData = {
