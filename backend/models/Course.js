@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 // Reviews from students — shown on AlumniProfile → Reviews tab
 const reviewSchema = new mongoose.Schema({
-  student: { type: mongoose.Schema.Types.ObjectId, ref: 'BaseUser', required: true },
+  student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   rating:  { type: Number, required: true, min: 1, max: 5 },
   // ⭐⭐⭐⭐⭐ shown as repeated star emoji on Reviews tab
   comment: { type: String, maxlength: 500 },
@@ -10,7 +10,7 @@ const reviewSchema = new mongoose.Schema({
 
 // Each student's enrollment record — created after PaymentModal success
 const enrollmentSchema = new mongoose.Schema({
-  student:       { type: mongoose.Schema.Types.ObjectId, ref: 'BaseUser' },
+  student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
   enrolledAt:    { type: Date, default: Date.now },
   paymentId:     { type: String, default: '' },
   paymentMethod: { type: String, enum: ['card', 'upi', 'net'], default: 'upi' },
@@ -40,7 +40,7 @@ const courseSchema = new mongoose.Schema(
     // AlumniProfile → Sessions tab: instructor's sessions listed
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'BaseUser',
+      ref: 'Alumni',
       required: true,
     },
 

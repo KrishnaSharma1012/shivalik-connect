@@ -4,7 +4,7 @@ const earningSchema = new mongoose.Schema(
   {
     alumni: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "BaseUser",
+      ref: 'Alumni',
       required: true,
     },
     source: {
@@ -21,7 +21,7 @@ const earningSchema = new mongoose.Schema(
     grossAmount: { type: Number, required: true },    // full price paid by student
     alumniShare: { type: Number, required: true },    // 80% of grossAmount
     platformFee: { type: Number, required: true },    // 20% of grossAmount
-    student: { type: mongoose.Schema.Types.ObjectId, ref: "BaseUser" },
+    student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
     status: {
       type: String,
       enum: ["pending", "paid", "withdrawn"],

@@ -1,5 +1,7 @@
 import Message from "../models/Message.js";
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 
 // Token rules
 const TOKENS = {

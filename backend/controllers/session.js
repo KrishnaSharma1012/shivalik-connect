@@ -1,5 +1,7 @@
 import Session from "../models/Session.js";
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 import Earning from "../models/Earning.js";
 import { uploadImage } from "../config/cloudinary.js";
 
@@ -55,7 +57,7 @@ export const getMySessions = async (req, res) => {
 // ─────────────────────────────────────────────
 export const createSession = async (req, res) => {
   try {
-    const user = await BaseUser.findById(req.user._id); // ✅ FIX
+    const user = await ((await Student.findById(req.user._id)) || (await Alumni.findById(req.user._id)) || (await Admin.findById(req.user._id))); // ✅ FIX
 
     if (user.alumniPlan !== "premium") {
       return res.status(403).json({ message: "Upgrade to Premium to host sessions" });

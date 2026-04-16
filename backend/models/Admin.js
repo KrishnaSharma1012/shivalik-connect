@@ -1,35 +1,44 @@
 import mongoose from "mongoose";
-import BaseUser from './BaseUser.js';
+import bcrypt from "bcryptjs";
 
 const adminSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, default: "admin" },
+  avatar: { type: String, default: "" },
+  coverPhoto: { type: String, default: "" },
+  about: { type: String, default: "" },
+  title: { type: String, default: "" },
+  headline: { type: String, default: "" },
+  skills: [String],
+  college: { type: String, default: "" },
+  company: { type: String, default: "" },
+  tokens: { type: Number, default: 0 },
+  isVerified: { type: Boolean, default: false },
+  isSuspended: { type: Boolean, default: false },
 
-  department: {
-    type: String,
-    default: 'General',
-  },
-
-  // Granular permissions — controls what admin can do
-  // All true by default for standard admin
-  permissions: {
-    manageUsers:    { type: Boolean, default: true },
-    // /admin/users — verify alumni, suspend, restore, delete
-    manageCourses:  { type: Boolean, default: true },
-    // /admin/courses — approve, reject, manage course listings
-    manageSessions: { type: Boolean, default: true },
-    // /admin/sessions — monitor upcoming live sessions
-    viewAnalytics:  { type: Boolean, default: true },
-    // /admin/analytics — revenue, retention, trends
-    approveAlumni:  { type: Boolean, default: true },
-    // Verify alumni accounts (the "✓ Verify" button in Users table)
-  },
-
-  // Super admin can create other admins and change permissions
-  isSuperAdmin: {
+  dashboardAccess: {
     type: Boolean,
-    default: false,
+    default: true,
   },
+  // Sub-admins vs super-admins
+  permissions: [{
+    type: String,
+    enum: ['manage_users', 'manage_posts', 'manage_courses', 'manage_reports'],
+  }],
+}, { timestamps: true });
+
+// ── Hooks & Methods ──────────────────────────────────────────────────
+adminSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
-const Admin = BaseUser.discriminator('admin', adminSchema);
+adminSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
+const Admin = mongoose.model("Admin", adminSchema);
 export default Admin;

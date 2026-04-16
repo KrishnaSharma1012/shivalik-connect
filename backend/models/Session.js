@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 // Each student's enrollment record — created after payment
 const enrollmentSchema = new mongoose.Schema({
-  student:       { type: mongoose.Schema.Types.ObjectId, ref: 'BaseUser' },
+  student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
   enrolledAt:    { type: Date, default: Date.now },
   paymentId:     { type: String, default: '' },
   paymentMethod: { type: String, enum: ['card', 'upi', 'net'], default: 'upi' },
@@ -33,7 +33,7 @@ const sessionSchema = new mongoose.Schema(
     // AlumniProfile → Sessions tab: instructor's sessions listed
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'BaseUser',
+      ref: 'Alumni',
       required: true,
     },
 

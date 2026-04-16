@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 
 // ── Protect: verify JWT, attach user to req ─────────────────
 export const protect = async (req, res, next) => {
@@ -23,7 +25,7 @@ export const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // 🔹 Find user (IMPORTANT FIX)
-    const user = await BaseUser.findById(decoded.userId || decoded.id).select("-password");
+    const user = await ((await Student.findById(decoded.userId || decoded.id).select('-password')) || (await Alumni.findById(decoded.userId || decoded.id).select('-password')) || (await Admin.findById(decoded.userId || decoded.id).select('-password')));
 
     if (!user) {
       return res.status(401).json({ message: "User no longer exists." });

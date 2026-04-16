@@ -1,4 +1,6 @@
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 import Session from "../models/Session.js";
 import Course from "../models/Course.js";
 
@@ -7,7 +9,7 @@ import Course from "../models/Course.js";
 // ─────────────────────────────
 export const getUsers = async (req, res) => {
   try {
-    const users = await BaseUser.find().select("-password");
+    const users = await [...(await Student.find().select('-password')), ...(await Alumni.find().select('-password'))];
     res.json({ users });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });

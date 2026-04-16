@@ -1,5 +1,7 @@
 import Connection from "../models/Connection.js";
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 
 // ─────────────────────────────────────────────
 // SEND REQUEST
@@ -13,7 +15,7 @@ export const sendRequest = async (req, res) => {
       return res.status(400).json({ message: "Cannot connect with yourself" });
     }
 
-    const alumni = await BaseUser.findById(alumniId);
+    const alumni = await ((await Student.findById(alumniId)) || (await Alumni.findById(alumniId)) || (await Admin.findById(alumniId)));
     if (!alumni || alumni.role !== "alumni") {
       return res.status(404).json({ message: "Alumni not found" });
     }

@@ -1,19 +1,16 @@
 import mongoose from "mongoose";
-import BaseUser from './BaseUser.js';
+import bcrypt from "bcryptjs";
 
 // ── Sub-schemas ──────────────────────────────────────────────
 
-// Each course the student has enrolled in via PaymentModal
 const enrolledCourseSchema = new mongoose.Schema({
   course:        { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   enrolledAt:    { type: Date, default: Date.now },
   paymentId:     { type: String, default: '' },
   paymentMethod: { type: String, enum: ['card', 'upi', 'net'], default: 'upi' },
-  // PaymentModal methods: "💳 Credit/Debit Card", "📱 UPI", "🏦 Net Banking"
   amountPaid:    { type: Number, default: 0 },
 }, { _id: false });
 
-// Each session the student has enrolled in via PaymentModal
 const enrolledSessionSchema = new mongoose.Schema({
   session:       { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
   enrolledAt:    { type: Date, default: Date.now },
@@ -22,118 +19,81 @@ const enrolledSessionSchema = new mongoose.Schema({
   amountPaid:    { type: Number, default: 0 },
 }, { _id: false });
 
-// Connection requests sent to alumni
 const connectionRequestSchema = new mongoose.Schema({
-  alumni:  { type: mongoose.Schema.Types.ObjectId, ref: 'BaseUser' },
+  alumni:  { type: mongoose.Schema.Types.ObjectId, ref: 'Alumni' },
   sentAt:  { type: Date, default: Date.now },
   status:  {
     type: String,
     enum: ['pending', 'accepted', 'rejected'],
     default: 'pending',
-    // AlumniCard states: "Connect" → "Pending…" → "✓ Connected"
   },
 }, { _id: false });
 
 // ── Student Schema ───────────────────────────────────────────
 
 const studentSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, default: "student" },
+  avatar: { type: String, default: "" },
+  coverPhoto: { type: String, default: "" },
+  about: { type: String, default: "" },
+  title: { type: String, default: "" },
+  headline: { type: String, default: "" },
+  skills: [String],
+  college: { type: String, default: "" },
+  company: { type: String, default: "" },
+  tokens: { type: Number, default: 0 },
+  isVerified: { type: Boolean, default: false },
+  isSuspended: { type: Boolean, default: false },
 
-  // ── Academic Info ──────────────────────────────────────────
-  // Collected at Signup Step 2 (college) and profile edit
-  // NO cgpa — not present anywhere in the frontend
-  year: {
-    type: Number,
-    min: 1,
-    max: 5,
-    default: 1,
-  },
-  branch: {
-    type: String,
-    default: '',
-    // e.g. "Computer Science", "ECE"
-  },
+  year: { type: Number, min: 1, max: 5, default: 1 },
+  branch: { type: String, default: '' },
 
-  // ── Enrolled Courses ───────────────────────────────────────
-  // Populated when student pays via PaymentModal (card/upi/net)
-  // Stats card on StudentProfile: "Courses Enrolled: 4"
-  // Academics page: used to show which courses are already enrolled
   enrolledCourses: [enrolledCourseSchema],
-
-  // ── Enrolled Sessions ──────────────────────────────────────
-  // Populated when student pays via PaymentModal for a live session
-  // Stats card on StudentProfile: "Sessions Attended: 10"
   enrolledSessions: [enrolledSessionSchema],
 
-  // ── Connections ────────────────────────────────────────────
-  // Student clicks "Connect" on AlumniCard → creates pending request
-  // "Pending…" state → "✓ Connected" when alumni accepts
-  // Stats card on StudentProfile: "Connections: 25"
-  // Stats card on StudentProfile: "Mentors Connected: 8"
   connectionRequests: [connectionRequestSchema],
   connections: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'BaseUser',   // Alumni they are connected to
+    ref: 'Alumni',
   }],
 
-  // ── Badges / Flags ─────────────────────────────────────────
-
-  // Student's college is a partner college
-  // Academics page banner: "Partner College Discount Active — Up to 30% off"
-  // CourseCard shows "🏛 Partner" badge for partner college courses
-  isCollegePartner: {
-    type: Boolean,
-    default: false,
-  },
-
-  // Student paid platform fee for 24h guaranteed replies from premium alumni
-  // StudentProfile: "⚡ Unlock 24h Guaranteed Replies" → "Upgrade Now" button
-  has24hReply: {
-    type: Boolean,
-    default: false,
-  },
-  replyUnlockExpiresAt: {
-    type: Date,
-    default: null,
-  },
-});
+  isCollegePartner: { type: Boolean, default: false },
+  has24hReply: { type: Boolean, default: false },
+  replyUnlockExpiresAt: { type: Date, default: null },
+}, { timestamps: true });
 
 // ── Virtuals ─────────────────────────────────────────────────
-
-// Stats shown on StudentProfile stats card
-studentSchema.virtual('coursesEnrolledCount').get(function () {
-  return this.enrolledCourses.length;
-});
-studentSchema.virtual('sessionsAttendedCount').get(function () {
-  return this.enrolledSessions.length;
-});
-studentSchema.virtual('connectionsCount').get(function () {
-  return this.connections.length;
-});
+studentSchema.virtual('coursesEnrolledCount').get(function () { return this.enrolledCourses.length; });
+studentSchema.virtual('sessionsAttendedCount').get(function () { return this.enrolledSessions.length; });
+studentSchema.virtual('connectionsCount').get(function () { return this.connections.length; });
 
 studentSchema.set('toJSON',   { virtuals: true });
 studentSchema.set('toObject', { virtuals: true });
 
-// ── Methods ──────────────────────────────────────────────────
+// ── Hooks & Methods ──────────────────────────────────────────────────
+studentSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
 
-// Enroll in a course after payment success
+studentSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
 studentSchema.methods.enrollCourse = function ({ courseId, amountPaid, paymentId, paymentMethod }) {
-  const alreadyEnrolled = this.enrolledCourses.some(
-    ec => ec.course.toString() === courseId.toString()
-  );
+  const alreadyEnrolled = this.enrolledCourses.some(ec => ec.course.toString() === courseId.toString());
   if (alreadyEnrolled) throw new Error('Already enrolled in this course');
   this.enrolledCourses.push({ course: courseId, amountPaid, paymentId, paymentMethod });
 };
-
-// Enroll in a session after payment success
 studentSchema.methods.enrollSession = function ({ sessionId, amountPaid, paymentId, paymentMethod }) {
-  const alreadyEnrolled = this.enrolledSessions.some(
-    es => es.session.toString() === sessionId.toString()
-  );
+  const alreadyEnrolled = this.enrolledSessions.some(es => es.session.toString() === sessionId.toString());
   if (alreadyEnrolled) throw new Error('Already enrolled in this session');
   this.enrolledSessions.push({ session: sessionId, amountPaid, paymentId, paymentMethod });
 };
-
-// Check enrollment status (used to show "Enrolled" state on CourseCard/SessionCard)
 studentSchema.methods.isEnrolledInCourse = function (courseId) {
   return this.enrolledCourses.some(ec => ec.course.toString() === courseId.toString());
 };
@@ -141,6 +101,5 @@ studentSchema.methods.isEnrolledInSession = function (sessionId) {
   return this.enrolledSessions.some(es => es.session.toString() === sessionId.toString());
 };
 
-const Student = BaseUser.discriminator('student', studentSchema);
-
+const Student = mongoose.model("Student", studentSchema);
 export default Student;

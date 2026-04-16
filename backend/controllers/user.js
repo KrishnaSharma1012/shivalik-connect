@@ -1,4 +1,6 @@
-import BaseUser from "../models/BaseUser.js";
+import Student from '../models/Student.js';
+import Alumni from '../models/Alumni.js';
+import Admin from '../models/Admin.js';
 import Course from "../models/Course.js";
 import Session from "../models/Session.js";
 import { uploadImage } from "../config/cloudinary.js";
@@ -51,7 +53,7 @@ export const getAlumni = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getUserById = async (req, res) => {
   try {
-    const user = await BaseUser.findById(req.params.id).select("-password");
+    const user = await ((await Student.findById(req.params.id).select('-password')) || (await Alumni.findById(req.params.id).select('-password')) || (await Admin.findById(req.params.id).select('-password')));
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
