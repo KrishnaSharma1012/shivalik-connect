@@ -113,26 +113,37 @@ export default function CreatePost({ onAddPost }) {
     setActiveMediaIndex(prev => (prev + 1) % media.length);
   };
 
+  // Convert File object to base64 string
+  const toBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+  });
+
   const handlePost = async () => {
     if (!canPost || posting) return;
     setPosting(true);
-    await new Promise(r => setTimeout(r, 400));
-    onAddPost({
-      id: Date.now(),
-      author: user?.name || "You",
-      authorAvatar: user?.avatar || null,
-      role: user?.headline || "Alumni",
-      content: text,
-      media,
-      time: "Just now",
-      likes: 0,
-      verified: true,
-      isPremium: user?.alumniPlan === "premium",
-    });
-    setText("");
-    setMedia([]);
-    setActiveMediaIndex(0);
-    setPosting(false);
+    try {
+      // Convert file objects to base64 so the backend can upload to Cloudinary
+      const mediaBase64 = await Promise.all(
+        media.filter(m => m.file).map(m => toBase64(m.file))
+      );
+
+      await onAddPost({
+        content: text,
+        media: mediaBase64,
+      });
+
+      setText("");
+      setMedia([]);
+      setActiveMediaIndex(0);
+    } catch (err) {
+      console.error("Post failed:", err);
+      alert("Failed to create post. Please try again.");
+    } finally {
+      setPosting(false);
+    }
   };
 
   const activeMedia = media[activeMediaIndex];

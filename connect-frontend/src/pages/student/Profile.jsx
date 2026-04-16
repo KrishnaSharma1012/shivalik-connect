@@ -19,8 +19,6 @@ export default function StudentProfile() {
   const { user, updateUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [membershipModalOpen, setMembershipModalOpen] = useState(false);
-  const [avatar, setAvatar] = useState(user?.avatar || null);
-  const [coverPhoto, setCoverPhoto] = useState(user?.coverPhoto || null);
   const activeMembershipList = user?.activeMembershipList || [
     { id: 1, name: "Rahul Sharma", company: "Google", plan: "Monthly", since: "Jan 2026", amount: "Rs.199/mo" },
     { id: 2, name: "Meera Pillai", company: "Flipkart", plan: "Monthly", since: "Mar 2026", amount: "Rs.199/mo" },
@@ -30,14 +28,22 @@ export default function StudentProfile() {
   ];
   const activeMemberships = user?.activeMemberships ?? activeMembershipList.length;
 
-  const handleAvatarChange = (url) => {
-    setAvatar(url);
-    updateUser?.({ avatar: url });
+  const handleAvatarChange = async (base64) => {
+    try {
+      await updateUser({ avatar: base64 });
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      alert("Failed to upload profile photo. Please try again.");
+    }
   };
 
-  const handleCoverChange = (url) => {
-    setCoverPhoto(url);
-    updateUser?.({ coverPhoto: url });
+  const handleCoverChange = async (base64) => {
+    try {
+      await updateUser({ coverPhoto: base64 });
+    } catch (err) {
+      console.error("Cover photo upload failed:", err);
+      alert("Failed to upload cover photo. Please try again.");
+    }
   };
 
   return (
@@ -50,7 +56,7 @@ export default function StudentProfile() {
         </div>
 
         <ProfileCard
-          user={{ ...user, skills: user?.skills || ["DSA", "React", "Problem Solving"], avatar, coverPhoto }}
+          user={user}
           onEdit={() => setOpen(true)}
           onAvatarChange={handleAvatarChange}
           onCoverChange={handleCoverChange}
@@ -194,9 +200,14 @@ export default function StudentProfile() {
         <Modal isOpen={open} onClose={() => setOpen(false)} title="Edit Profile" size="md">
           <EditProfile
             user={user}
-            onSave={(updated) => {
-              updateUser?.(updated);
-              setOpen(false);
+            onSave={async (updated) => {
+              try {
+                await updateUser(updated);
+                setOpen(false);
+              } catch (err) {
+                console.error("Profile save failed:", err);
+                alert("Failed to save profile. Please try again.");
+              }
             }}
           />
         </Modal>

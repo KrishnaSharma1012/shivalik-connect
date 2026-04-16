@@ -113,15 +113,12 @@ export const login = async (req, res) => {
       sameSite: "lax",
     });
 
+    // ✅ Return FULL user profile so frontend doesn't lose fields like alumniPlan
+    const fullUser = await BaseUser.findById(user._id).select("-password");
+
     res.json({
       message: "Login successful",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-      },
+      user: fullUser,
       token,
     });
   } catch (err) {

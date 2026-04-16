@@ -51,31 +51,31 @@ function AlumniProfile() {
     fetchData();
   }, [user]);
 
-  const handleAvatarChange = async (url) => {
+  const handleAvatarChange = async (base64) => {
     try {
-      const res = await API.put("/users/profile", { avatar: url });
-      updateUser(res.data.user);
+      await updateUser({ avatar: base64 });
     } catch (err) {
       console.error("Avatar upload failed:", err);
+      alert("Failed to upload avatar. Please try again.");
     }
   };
 
-  const handleCoverChange = async (url) => {
+  const handleCoverChange = async (base64) => {
     try {
-      const res = await API.put("/users/profile", { coverPhoto: url });
-      updateUser(res.data.user);
+      await updateUser({ coverPhoto: base64 });
     } catch (err) {
       console.error("Cover photo upload failed:", err);
+      alert("Failed to upload cover photo. Please try again.");
     }
   };
 
   const handleSaveProfile = async (updated) => {
     try {
-      const res = await API.put("/users/profile", updated);
-      updateUser(res.data.user);
+      await updateUser(updated);
       setOpen(false);
     } catch (err) {
       console.error("Profile update failed:", err);
+      alert("Failed to update profile. Please try again.");
     }
   };
 

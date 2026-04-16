@@ -38,10 +38,15 @@ export default function AlumniFeed() {
 
   const addPost = async (newPost) => {
     try {
-      const res = await API.post("/posts", { content: newPost.content });
+      await API.post("/posts", {
+        content: newPost.content,
+        media: newPost.media || [],
+      });
       fetchPosts();
     } catch (err) {
-      console.error(err);
+      console.error("Failed to create post:", err);
+      const errMsg = err?.response?.data?.message || err.message;
+      alert("Failed to post: " + errMsg);
     }
   };
 

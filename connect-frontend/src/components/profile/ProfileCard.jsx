@@ -24,18 +24,34 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
   const [avatarHover, setAvatarHover] = useState(false);
   const [coverHover, setCoverHover] = useState(false);
 
-  const handleAvatarFile = (e) => {
+  // Convert file to base64 so backend can upload to Cloudinary
+  const toBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+  });
+
+  const handleAvatarFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onAvatarChange && onAvatarChange(url);
+    try {
+      const base64 = await toBase64(file);
+      onAvatarChange && onAvatarChange(base64);
+    } catch (err) {
+      console.error("Avatar file read failed:", err);
+    }
   };
 
-  const handleCoverFile = (e) => {
+  const handleCoverFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onCoverChange && onCoverChange(url);
+    try {
+      const base64 = await toBase64(file);
+      onCoverChange && onCoverChange(base64);
+    } catch (err) {
+      console.error("Cover file read failed:", err);
+    }
   };
 
   return (
