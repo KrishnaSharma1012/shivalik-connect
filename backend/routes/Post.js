@@ -2,6 +2,7 @@ import express from "express";
 import {
   getPosts,
   getMyPosts,
+  getPostsByUser,
   createPost,
   editPost,
   deletePost,
@@ -28,6 +29,9 @@ router.get("/", getPosts);
 
 // Get my posts (must come before /:id)
 router.get("/my", getMyPosts);
+
+// Get posts by specific user
+router.get("/user/:userId", getPostsByUser);
 
 // Create post
 router.post("/", createPost);

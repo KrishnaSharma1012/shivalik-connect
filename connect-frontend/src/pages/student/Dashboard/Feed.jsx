@@ -4,30 +4,23 @@ import MainLayout from "../../../components/layout/MainLayout";
 import PostCard from "../../../components/feed/PostCard";
 import { getPosts } from "../../../services/feedService";
 
-import { DUMMY_POSTS } from "../../../utils/mockData";
-
 const FilterTabs = ["All", "Connected", "Trending", "Current Activity"];
 
 export default function Feed() {
   const navigate = useNavigate();
 
-  const [posts, setPosts] = useState([]); // ✅ real posts
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All");
 
-  // 🔥 FETCH POSTS FROM BACKEND
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         const data = await getPosts();
-        if (data.posts && data.posts.length > 0) {
-          setPosts(data.posts);
-        } else {
-          setPosts(DUMMY_POSTS);
-        }
+        setPosts(data.posts || []);
       } catch (err) {
         console.error("Error fetching posts", err);
-        setPosts(DUMMY_POSTS);
+        setPosts([]);
       } finally {
         setLoading(false);
       }
@@ -36,12 +29,10 @@ export default function Feed() {
     fetchPosts();
   }, []);
 
-  // 🔥 OPEN PROFILE
   const openAlumniProfile = (post) => {
     navigate(`/profile/${post.author._id}`);
   };
 
-  // 🔥 FILTER LOGIC (adjusted for backend)
   const filteredPosts = posts.filter((p) => {
     if (activeTab === "All") return true;
     if (activeTab === "Connected") return p.author?.isVerified || p.author?.verified;

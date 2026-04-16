@@ -46,6 +46,22 @@ export const getMyPosts = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
+// GET POSTS BY USER ID
+// ─────────────────────────────────────────────
+export const getPostsByUser = async (req, res) => {
+  try {
+    const posts = await Post.find({ author: req.params.userId })
+      .populate("author", "name avatar role college company alumniPlan isVerified")
+      .populate("comments.author", "name avatar role")
+      .sort({ createdAt: -1 });
+
+    res.json({ posts });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
 // CREATE POST
 // ─────────────────────────────────────────────
 export const createPost = async (req, res) => {

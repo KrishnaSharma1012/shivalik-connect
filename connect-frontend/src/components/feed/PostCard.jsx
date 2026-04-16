@@ -109,16 +109,14 @@ export default function PostCard({ post, onOpenProfile }) {
   const handleComment = async () => {
     if (!comment.trim()) return;
     const textToSend = comment;
-    setComment("");
     if (post._id) {
       try {
         const res = await import("../../utils/api").then(m => m.default.post(`/posts/${post._id}/comment`, { content: textToSend }));
         setComments(prev => [...prev, res.data.comment]);
+        setComment("");
         return;
       } catch (err) { console.error(err); }
     }
-    // Fallback for dummy posts
-    setComments(prev => [...prev, { content: textToSend, time: "Just now" }]);
   };
 
   const slides = post.media?.filter(m => m.type === "image" || m.type === "video") || [];

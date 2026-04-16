@@ -7,9 +7,6 @@ import CrownIcon from "../../../components/common/CrownIcon";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
 
-
-import { DUMMY_POSTS } from "../../../utils/mockData";
-
 export default function AlumniFeed() {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
@@ -23,15 +20,10 @@ export default function AlumniFeed() {
   const fetchPosts = async () => {
     try {
       const res = await API.get("/posts");
-      const fetchedPosts = res.data.posts || [];
-      if (fetchedPosts.length > 0) {
-        setPosts(fetchedPosts);
-      } else {
-        setPosts(DUMMY_POSTS);
-      }
+      setPosts(res.data.posts || []);
     } catch(err) {
       console.error(err);
-      setPosts(DUMMY_POSTS);
+      setPosts([]);
     }
   };
 

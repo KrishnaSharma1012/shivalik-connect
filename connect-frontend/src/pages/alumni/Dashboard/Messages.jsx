@@ -16,7 +16,6 @@ const StarIcon = () => (
 
 import API from "../../../utils/api";
 import { useLocation } from "react-router-dom";
-import { DUMMY_CONVERSATIONS, DUMMY_MESSAGES } from "../../../utils/mockData";
 
 /* ── Conversation Item ── */
 function ConversationItem({ chat, active, onClick }) {
@@ -87,17 +86,12 @@ export default function AlumniMessages() {
         color: "#7C5CFC",
         subscribed: c.partner?.role === "student"
       })).filter(c => c.id);
-      
-      if (formatted.length > 0) {
-        setConversations(formatted);
-      } else {
-        setConversations(DUMMY_CONVERSATIONS);
-      }
+      setConversations(formatted);
       
       const searchParams = new URLSearchParams(location.search);
       const userParam = searchParams.get("user");
-      
-      const currentList = formatted.length > 0 ? formatted : DUMMY_CONVERSATIONS;
+
+      const currentList = formatted;
 
       if (userParam) {
         const existing = currentList.find(c => c.id === userParam);
@@ -105,11 +99,13 @@ export default function AlumniMessages() {
         else setActiveChat({ id: userParam, name: "New Conversation", company: "Start chatting...", avatar: "N", color: "#7C5CFC", subscribed: true });
       } else if (currentList.length > 0 && !activeChat) {
         setActiveChat(currentList[0]);
+      } else if (currentList.length === 0) {
+        setActiveChat(null);
       }
     } catch(err) { 
        console.error(err);
-       setConversations(DUMMY_CONVERSATIONS);
-       if (!activeChat && DUMMY_CONVERSATIONS.length > 0) setActiveChat(DUMMY_CONVERSATIONS[0]);
+       setConversations([]);
+       setActiveChat(null);
     }
   };
 
@@ -121,19 +117,15 @@ export default function AlumniMessages() {
     try {
       const res = await API.get(`/messages/${userId}`);
       const fetched = res.data.messages || [];
-      if (fetched.length > 0) {
-        const formatted = fetched.map(m => ({
-          sender: m.sender._id === userId ? "them" : "me",
-          text: m.content,
-          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
-        }));
-        setMessages(formatted);
-      } else {
-        setMessages(DUMMY_MESSAGES);
-      }
+      const formatted = fetched.map(m => ({
+        sender: m.sender._id === userId ? "them" : "me",
+        text: m.content,
+        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
+      }));
+      setMessages(formatted);
     } catch(err) { 
       console.error(err);
-      setMessages(DUMMY_MESSAGES);
+      setMessages([]);
     }
   };
 

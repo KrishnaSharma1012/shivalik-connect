@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
+import API from "../../../utils/api";
 
 const IconStar = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -143,9 +144,98 @@ export default function AlumniMembershipPage() {
   const isPremium = user?.alumniPlan === "premium";
 
   // Hooks must always be called before any conditional returns
-  const [membershipActive, setMembershipActive] = useState(false);
+  const [membershipActive, setMembershipActive] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [membershipData, setMembershipData] = useState({
+    startDate: "-",
+    renewDate: "-",
+    daysLeft: 0,
+    subscribers: 0,
+    totalEarned: "₹0",
+    thisMonth: "₹0",
+    recentSubscribers: [],
+    revenueHistory: [],
+    grossRevenue: 0,
+    platformFee: 0,
+    netEarnings: 0,
+    pendingPayout: 0,
+  });
+
+  useEffect(() => {
+    const formatMoney = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+
+    const fetchMembershipData = async () => {
+      try {
+        const [statsRes, conversationsRes] = await Promise.all([
+          API.get("/earnings/stats"),
+          API.get("/messages/conversations"),
+        ]);
+
+        const stats = statsRes.data || {};
+        const conversations = conversationsRes.data?.conversations || [];
+        const studentConversations = conversations.filter(
+          (c) => c.partner?.role === "student" && c.partner?._id
+        );
+
+        const uniqueStudentsMap = new Map();
+        studentConversations.forEach((c) => {
+          if (!uniqueStudentsMap.has(c.partner._id)) {
+            uniqueStudentsMap.set(c.partner._id, c);
+          }
+        });
+
+        const recentSubscribers = Array.from(uniqueStudentsMap.values())
+          .slice(0, 5)
+          .map((c) => ({
+            name: c.partner?.name || "Student",
+            college: c.partner?.college || "-",
+            date: c.lastTime
+              ? new Date(c.lastTime).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                })
+              : "-",
+            avatar: (c.partner?.name || "S")
+              .split(" ")
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase(),
+          }));
+
+        const now = new Date();
+        const renewDateObj = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysLeft = Math.max(0, Math.ceil((renewDateObj - now) / msPerDay));
+        const monthLabel = now.toLocaleDateString("en-IN", { month: "short" });
+        const thisMonthAmount = Number(stats.thisMonth || 0);
+
+        setMembershipData({
+          startDate: user?.createdAt
+            ? new Date(user.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+            : "-",
+          renewDate: renewDateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+          daysLeft,
+          subscribers: uniqueStudentsMap.size,
+          totalEarned: formatMoney(stats.netEarnings || 0),
+          thisMonth: formatMoney(thisMonthAmount),
+          recentSubscribers,
+          revenueHistory: thisMonthAmount > 0 ? [{ month: monthLabel, amount: Math.round(thisMonthAmount) }] : [],
+          grossRevenue: Number(stats.totalGross || 0),
+          platformFee: Number(stats.platformFee || 0),
+          netEarnings: Number(stats.netEarnings || 0),
+          pendingPayout: thisMonthAmount,
+        });
+      } catch (err) {
+        console.error("Membership fetch error", err);
+      }
+    };
+
+    if (isPremium) {
+      fetchMembershipData();
+    }
+  }, [isPremium, user?.createdAt]);
 
   if (!isPremium) {
     return (
@@ -186,28 +276,6 @@ export default function AlumniMembershipPage() {
       </MainLayout>
     );
   }
-
-  // Mock data for when membership is active
-  const membershipData = {
-    startDate: "Apr 1, 2026",
-    renewDate: "May 1, 2026",
-    daysLeft: 23,
-    subscribers: 14,
-    totalEarned: "₹1,950",
-    thisMonth: "₹1,393",
-    recentSubscribers: [
-      { name: "Arjun Mehta", college: "IIT Delhi", date: "Apr 6", avatar: "AM" },
-      { name: "Priya Nair", college: "DTU", date: "Apr 4", avatar: "PN" },
-      { name: "Rohan Gupta", college: "BITS Pilani", date: "Apr 2", avatar: "RG" },
-      { name: "Sneha M.", college: "VIT Vellore", date: "Apr 1", avatar: "SM" },
-    ],
-    revenueHistory: [
-      { month: "Jan", amount: 697 },
-      { month: "Feb", amount: 836 },
-      { month: "Mar", amount: 1114 },
-      { month: "Apr", amount: 1393 },
-    ],
-  };
 
   const hasSubscribers = membershipData.subscribers > 0;
   const canPauseMembership = !hasSubscribers;
@@ -355,7 +423,7 @@ export default function AlumniMembershipPage() {
                     {/* Stats row */}
                     <motion.div variants={stagger} initial="hidden" animate="show" style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
                       <StatCard icon={<IconUsers />} value={membershipData.subscribers} label="Active Subscribers" sub="paying monthly" color="#00E5C3" />
-                      <StatCard icon={<IconRupee />} value={membershipData.thisMonth} label="This Month" sub="70% of ₹199 × 10" color="var(--purple-light)" />
+                      <StatCard icon={<IconRupee />} value={membershipData.thisMonth} label="This Month" sub="from enrolled students" color="var(--purple-light)" />
                       <StatCard icon={<IconTrendUp />} value={membershipData.totalEarned} label="Total Earned" sub="since activation" color="var(--orange)" />
                       <StatCard icon={<IconClock />} value={`${membershipData.daysLeft}d`} label="Next Renewal" sub={membershipData.renewDate} color="#F5C842" />
                     </motion.div>
@@ -421,9 +489,17 @@ export default function AlumniMembershipPage() {
                           </div>
                         </motion.div>
                       ))}
-                      <div style={{ padding: "14px 24px", background: "var(--bg-3)", display: "flex", justifyContent: "center" }}>
-                        <span style={{ fontSize: 13, color: "var(--text-3)" }}>+ {membershipData.subscribers - membershipData.recentSubscribers.length} more subscribers</span>
-                      </div>
+                      {membershipData.recentSubscribers.length === 0 ? (
+                        <div style={{ padding: "20px 24px", background: "var(--bg-3)", display: "flex", justifyContent: "center" }}>
+                          <span style={{ fontSize: 13, color: "var(--text-3)" }}>No active subscribers yet.</span>
+                        </div>
+                      ) : (
+                        <div style={{ padding: "14px 24px", background: "var(--bg-3)", display: "flex", justifyContent: "center" }}>
+                          <span style={{ fontSize: 13, color: "var(--text-3)" }}>
+                            + {Math.max(0, membershipData.subscribers - membershipData.recentSubscribers.length)} more subscribers
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -432,31 +508,35 @@ export default function AlumniMembershipPage() {
                   <motion.div key="revenue" initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 15 }} transition={{ duration: 0.3 }}>
                     <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, marginBottom: 16 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20 }}>Monthly Revenue (₹)</div>
-                      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", height: 140 }}>
-                        {membershipData.revenueHistory.map((item, i) => {
-                          const maxVal = Math.max(...membershipData.revenueHistory.map(r => r.amount));
-                          const heightPct = (item.amount / maxVal) * 100;
-                          return (
-                            <motion.div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: i === membershipData.revenueHistory.length - 1 ? "#00E5C3" : "var(--text-3)" }}>₹{item.amount}</div>
-                              <motion.div
-                                initial={{ height: 0 }} animate={{ height: `${heightPct}%` }} transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 0.68, 0, 1.1] }}
-                                style={{ width: "100%", borderRadius: "8px 8px 0 0", background: i === membershipData.revenueHistory.length - 1 ? "linear-gradient(180deg,#00E5C3,#0A8FE8)" : "rgba(255,255,255,0.1)" }}
-                              />
-                              <div style={{ fontSize: 12, color: "var(--text-3)" }}>{item.month}</div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
+                      {membershipData.revenueHistory.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--text-3)" }}>No monthly revenue history available yet.</p>
+                      ) : (
+                        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", height: 140 }}>
+                          {membershipData.revenueHistory.map((item, i) => {
+                            const maxVal = Math.max(...membershipData.revenueHistory.map(r => r.amount));
+                            const heightPct = maxVal > 0 ? (item.amount / maxVal) * 100 : 0;
+                            return (
+                              <motion.div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: i === membershipData.revenueHistory.length - 1 ? "#00E5C3" : "var(--text-3)" }}>₹{item.amount}</div>
+                                <motion.div
+                                  initial={{ height: 0 }} animate={{ height: `${heightPct}%` }} transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 0.68, 0, 1.1] }}
+                                  style={{ width: "100%", borderRadius: "8px 8px 0 0", background: i === membershipData.revenueHistory.length - 1 ? "linear-gradient(180deg,#00E5C3,#0A8FE8)" : "rgba(255,255,255,0.1)" }}
+                                />
+                                <div style={{ fontSize: 12, color: "var(--text-3)" }}>{item.month}</div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 18, padding: 24 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16 }}>Revenue Breakdown</div>
                       {[
-                        { label: "Gross subscription revenue (Apr)", value: "₹2,786", color: "var(--text)" },
-                        { label: "Platform fee (30%)", value: "− ₹835.80", color: "var(--orange)" },
-                        { label: "Your net earnings (70%)", value: "₹1,950.20", color: "#00E5C3" },
-                        { label: "Pending payout (next cycle)", value: "₹1,393", color: "var(--purple-light)" },
+                        { label: "Gross subscription revenue", value: `₹${membershipData.grossRevenue.toLocaleString("en-IN")}`, color: "var(--text)" },
+                        { label: "Platform fee", value: `− ₹${membershipData.platformFee.toLocaleString("en-IN")}`, color: "var(--orange)" },
+                        { label: "Your net earnings", value: `₹${membershipData.netEarnings.toLocaleString("en-IN")}`, color: "#00E5C3" },
+                        { label: "Pending payout (this month)", value: `₹${membershipData.pendingPayout.toLocaleString("en-IN")}`, color: "var(--purple-light)" },
                       ].map((row, i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
                           <span style={{ fontSize: 14, color: "var(--text-2)" }}>{row.label}</span>

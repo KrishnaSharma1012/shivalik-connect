@@ -11,7 +11,6 @@ import {
 } from "../../../utils/academicCatalog";
 import courseThumbnail from "../../../assets/hero.png";
 import API from "../../../utils/api";
-import { DUMMY_MY_SESSIONS } from "../../../utils/mockData";
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -901,15 +900,10 @@ export default function Sessions() {
         isLive: s.isLive || false, thumbnail: s.thumbnail || ""
       }));
       
-      const allItems = [...myCourses, ...mySessions];
-      if (allItems.length > 0) {
-        setSessions(allItems);
-      } else {
-        setSessions(DUMMY_MY_SESSIONS);
-      }
+      setSessions([...myCourses, ...mySessions]);
     } catch(err) {
       console.error(err);
-      setSessions(DUMMY_MY_SESSIONS);
+      setSessions([]);
     }
   };
 

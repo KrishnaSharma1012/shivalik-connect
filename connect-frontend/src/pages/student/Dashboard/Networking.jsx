@@ -3,7 +3,6 @@ import MainLayout from "../../../components/layout/MainLayout";
 import AlumniCard from "../../../components/networking/AlumniCard";
 import { useAuth } from "../../../context/AuthContext";
 import { getAlumni } from "../../../services/userService";
-import { DUMMY_ALUMNI } from "../../../utils/mockData";
 
 const SearchIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -22,14 +21,10 @@ export default function Networking() {
     const fetchAlumni = async () => {
       try {
         const data = await getAlumni();
-        if (data.alumni && data.alumni.length > 0) {
-          setAlumniList(data.alumni);
-        } else {
-          setAlumniList(DUMMY_ALUMNI);
-        }
+        setAlumniList(data.alumni || []);
       } catch (err) {
         console.error("Networking fetch error", err);
-        setAlumniList(DUMMY_ALUMNI);
+        setAlumniList([]);
       } finally {
         setLoading(false);
       }

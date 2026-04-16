@@ -5,7 +5,6 @@ import CrownIcon from "../../components/common/CrownIcon";
 import PostCard from "../../components/feed/PostCard";
 import PaymentModal from "../../components/academics/PaymentModal";
 import API from "../../utils/api";
-import { getPostsByAlumniName } from "../../utils/alumniData";
 
 const BackIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -155,6 +154,12 @@ export default function StudentAlumniProfile() {
   }
 
   const initial = (alumni.name || "A")[0].toUpperCase();
+  const sessionsCount = items.filter(item => item.type === "session" || item.type === "workshop").length;
+  const coursesCount = items.filter(item => item.type === "course").length;
+  const studentsCount = items.reduce((sum, item) => sum + (item.enrolledStudents?.length || item.enrolled || 0), 0);
+  const aboutText = alumni.about?.trim() || "This alumni has not added a bio yet.";
+  const skills = Array.isArray(alumni.skills) ? alumni.skills.filter(Boolean) : [];
+  const reviews = Array.isArray(alumni.reviews) ? alumni.reviews : [];
 
   return (
     <MainLayout>
@@ -207,7 +212,7 @@ export default function StudentAlumniProfile() {
                 }}>
                   {initial}
                 </div>
-                {alumni.verified && (
+                {alumni.isVerified && (
                   <div style={{
                     position: "absolute", bottom: -2, right: -2,
                     width: 22, height: 22, borderRadius: "50%",
@@ -281,8 +286,8 @@ export default function StudentAlumniProfile() {
               <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 24, color: "var(--text)" }}>
                 {alumni.name}
               </h1>
-              {alumni.verified && <span className="badge-verified">✓ Verified Alumni</span>}
-              {alumni.isPremium && (
+              {alumni.isVerified && <span className="badge-verified">✓ Verified Alumni</span>}
+              {alumni.alumniPlan === "premium" && (
                 <span style={{ display: "inline-flex", alignItems: "center" }}>
                   <CrownIcon size={16} />
                 </span>
@@ -293,7 +298,7 @@ export default function StudentAlumniProfile() {
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <span style={{ fontSize: 13, color: "var(--text-3)" }}>🎓 {alumni.college}</span>
-              {alumni.has24h && <span className="badge-24h">⚡ Replies within 24h</span>}
+              {alumni.has24hReply && <span className="badge-24h">⚡ Replies within 24h</span>}
               {allowsMembership && (
                 <span style={{ fontSize: 12, fontWeight: 700, color: membershipTaken ? "#10B981" : "#F5C842", background: membershipTaken ? "rgba(16,185,129,0.12)" : "rgba(245,200,66,0.12)", border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(245,200,66,0.3)", borderRadius: 99, padding: "4px 10px" }}>
                   {membershipTaken ? "Membership subscribed" : "Membership available"}
@@ -308,10 +313,10 @@ export default function StudentAlumniProfile() {
           display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20,
         }}>
           {[
-            { label: "Sessions", value: "45", color: "var(--purple-light)" },
-            { label: "Students", value: "200+", color: "var(--teal)" },
-            { label: "Courses", value: "6", color: "var(--orange)" },
-            { label: "Rating", value: "4.8⭐", color: "#F5C842" },
+            { label: "Sessions", value: String(sessionsCount), color: "var(--purple-light)" },
+            { label: "Students", value: String(studentsCount), color: "var(--teal)" },
+            { label: "Courses", value: String(coursesCount), color: "var(--orange)" },
+            { label: "Posts", value: String(posts.length), color: "#F5C842" },
           ].map((s, i) => (
             <div key={i} style={{
               background: "var(--bg-3)", border: "1px solid var(--border)",
@@ -349,7 +354,7 @@ export default function StudentAlumniProfile() {
             }}>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>About</h3>
               <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.75 }}>
-                Experienced professional helping students crack top companies with structured guidance, mock interviews, and real-world project advice. Passionate about mentoring the next generation of engineers.
+                {aboutText}
               </p>
             </div>
             <div style={{
@@ -357,15 +362,19 @@ export default function StudentAlumniProfile() {
               borderRadius: 16, padding: "20px 22px",
             }}>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Skills</h3>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["DSA", "System Design", "React", "Interview Prep", "LLD", "HLD", "Python"].map((skill, i) => (
+              {skills.length === 0 ? (
+                <p style={{ fontSize: 13, color: "var(--text-3)" }}>No skills added yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {skills.map((skill, i) => (
                   <span key={i} style={{
                     padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 500,
                     background: "rgba(124,92,252,0.1)", border: "1px solid rgba(124,92,252,0.22)",
                     color: "var(--purple-light)",
                   }}>{skill}</span>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -422,22 +431,25 @@ export default function StudentAlumniProfile() {
         {/* Reviews tab */}
         {activeTab === "Reviews" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s ease" }}>
-            {[
-              { name: "Priya M.", text: "Rahul's system design session was 🔥. Landed my Google offer 3 weeks later!", rating: 5 },
-              { name: "Karan S.", text: "Very thorough and patient mentor. Cleared all my doubts in one session.", rating: 5 },
-              { name: "Divya R.", text: "The FAANG prep course is worth every rupee. Highly recommended!", rating: 4 },
-            ].map((r, i) => (
-              <div key={i} style={{
-                background: "var(--bg-3)", border: "1px solid var(--border)",
-                borderRadius: 14, padding: "16px 20px",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{r.name}</span>
-                  <span style={{ color: "#F5C842", fontSize: 13 }}>{"⭐".repeat(r.rating)}</span>
-                </div>
-                <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6 }}>{r.text}</p>
+            {reviews.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "44px 20px", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 16 }}>
+                <p style={{ fontSize: 34, marginBottom: 10 }}>⭐</p>
+                <p style={{ fontSize: 14, color: "var(--text-3)" }}>No reviews yet.</p>
               </div>
-            ))}
+            ) : (
+              reviews.map((r, i) => (
+                <div key={r._id || i} style={{
+                  background: "var(--bg-3)", border: "1px solid var(--border)",
+                  borderRadius: 14, padding: "16px 20px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{r.author?.name || "Student"}</span>
+                    <span style={{ color: "#F5C842", fontSize: 13 }}>{"⭐".repeat(Number(r.rating || 0))}</span>
+                  </div>
+                  <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6 }}>{r.text || r.comment}</p>
+                </div>
+              ))
+            )}
           </div>
         )}
 
