@@ -1,7 +1,5 @@
 import Message from "../models/Message.js";
-import Student from '../models/Student.js';
-import Alumni from '../models/Alumni.js';
-import Admin from '../models/Admin.js';
+import { findUserById } from "../utils/userModels.js";
 
 // Token rules
 const TOKENS = {
@@ -53,17 +51,24 @@ export const getConversations = async (req, res) => {
       { $sort: { lastTime: -1 } },
     ]);
 
-    const populated = await BaseUser.populate(conversations, {
-      path: "_id",
-      select: "name avatar role college company alumniPlan isVerified",
-    });
+    const result = (
+      await Promise.all(
+        conversations.map(async (conversation) => {
+          const partner = await findUserById(conversation._id);
 
-    const result = populated.map((c) => ({
-      partner: c._id,
-      lastMessage: c.lastMessage,
-      lastTime: c.lastTime,
-      unread: c.unread,
-    }));
+          if (!partner) {
+            return null;
+          }
+
+          return {
+            partner,
+            lastMessage: conversation.lastMessage,
+            lastTime: conversation.lastTime,
+            unread: conversation.unread,
+          };
+        })
+      )
+    ).filter(Boolean);
 
     res.json({ conversations: result });
   } catch (err) {

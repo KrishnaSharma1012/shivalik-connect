@@ -22,6 +22,24 @@ const CheckIcon = () => (
   </svg>
 );
 
+const InfoIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
+const formatValue = (value, fallback = "—") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  return value;
+};
+
+const formatArray = (value) => {
+  if (!Array.isArray(value) || value.length === 0) return [];
+  return value.filter(Boolean);
+};
+
 
 
 export default function StudentAlumniProfile() {
@@ -160,6 +178,34 @@ export default function StudentAlumniProfile() {
   const aboutText = alumni.about?.trim() || "This alumni has not added a bio yet.";
   const skills = Array.isArray(alumni.skills) ? alumni.skills.filter(Boolean) : [];
   const reviews = Array.isArray(alumni.reviews) ? alumni.reviews : [];
+  const experience = formatArray(alumni.experience);
+  const availability = formatArray(alumni.availability);
+  const sessionPricing = formatArray(alumni.sessionPricing);
+  const alumniStats = alumni.stats || {};
+
+  const detailRows = [
+    { label: "Title", value: alumni.title },
+    { label: "Headline", value: alumni.headline },
+    { label: "Company", value: alumni.company },
+    { label: "College", value: alumni.college },
+    { label: "Domain", value: alumni.domain },
+    { label: "City", value: alumni.city },
+    { label: "Country", value: alumni.country },
+    { label: "Joining Year", value: alumni.joiningYear },
+    { label: "Passing Year", value: alumni.passingYear },
+    { label: "Degree", value: alumni.degree },
+    { label: "Branch", value: alumni.branch },
+    { label: "Plan", value: alumni.alumniPlan },
+    { label: "24h Reply", value: alumni.has24hReply ? "Enabled" : "Disabled" },
+    { label: "College Partner", value: alumni.isCollegePartner ? "Yes" : "No" },
+  ];
+
+  const statCards = [
+    { label: "Average Rating", value: alumni.avgRating ?? 0, sub: `${reviews.length} reviews`, color: "#F5C842" },
+    { label: "Review Count", value: alumni.reviewCount ?? reviews.length, sub: "student feedback", color: "var(--purple-light)" },
+    { label: "Connections", value: alumni.connectionsCount ?? (Array.isArray(alumni.connections) ? alumni.connections.length : 0), sub: "network size", color: "#00E5C3" },
+    { label: "Sessions Hosted", value: alumniStats.totalSessionsHosted ?? sessionsCount, sub: "live sessions", color: "var(--orange)" },
+  ];
 
   return (
     <MainLayout>
@@ -305,6 +351,20 @@ export default function StudentAlumniProfile() {
                 </span>
               )}
             </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 18 }}>
+              {[
+                { label: "Email", value: alumni.email },
+                { label: "Role", value: alumni.role },
+                { label: "Verified", value: alumni.isVerified ? "Yes" : "No" },
+                { label: "Premium", value: alumni.alumniPlan === "premium" ? "Premium" : "Simple" },
+              ].map((item) => (
+                <div key={item.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{formatValue(item.value)}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -326,6 +386,21 @@ export default function StudentAlumniProfile() {
                 {s.value}
               </p>
               <p style={{ fontSize: 11, color: "var(--text-3)" }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 12,
+          marginBottom: 20,
+        }}>
+          {statCards.map((stat) => (
+            <div key={stat.label} style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 14px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>{stat.label}</div>
+              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22, color: stat.color, marginBottom: 4 }}>{stat.value}</div>
+              <div style={{ fontSize: 11, color: "var(--text-3)" }}>{stat.sub}</div>
             </div>
           ))}
         </div>
@@ -357,6 +432,85 @@ export default function StudentAlumniProfile() {
                 {aboutText}
               </p>
             </div>
+
+            <div style={{
+              background: "var(--bg-3)", border: "1px solid var(--border)",
+              borderRadius: 16, padding: "20px 22px",
+            }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Profile Details</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                {detailRows.map((row) => (
+                  <div key={row.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 5 }}>
+                      <InfoIcon />
+                      {row.label}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.5 }}>
+                      {formatValue(row.value)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {availability.length > 0 && (
+              <div style={{
+                background: "var(--bg-3)", border: "1px solid var(--border)",
+                borderRadius: 16, padding: "20px 22px",
+              }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Availability</h3>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {availability.map((slot, i) => (
+                    <div key={i} style={{ padding: "10px 12px", borderRadius: 999, background: "rgba(0,229,195,0.08)", border: "1px solid rgba(0,229,195,0.2)", color: "var(--text)", fontSize: 12 }}>
+                      <strong>{slot.day}</strong>
+                      {slot.startTime && slot.endTime ? ` · ${slot.startTime} - ${slot.endTime}` : ""}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sessionPricing.length > 0 && (
+              <div style={{
+                background: "var(--bg-3)", border: "1px solid var(--border)",
+                borderRadius: 16, padding: "20px 22px",
+              }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Session Pricing</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                  {sessionPricing.map((item, i) => (
+                    <div key={i} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(124,92,252,0.08)", border: "1px solid rgba(124,92,252,0.18)" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Duration</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>{item.duration ? `${item.duration} mins` : "Custom"}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Price</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "var(--purple-light)" }}>₹{item.price ?? 0}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {experience.length > 0 && (
+              <div style={{
+                background: "var(--bg-3)", border: "1px solid var(--border)",
+                borderRadius: 16, padding: "20px 22px",
+              }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Experience</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {experience.map((exp, i) => (
+                    <div key={i} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", marginBottom: 4 }}>{formatValue(exp.title)}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 4 }}>{formatValue(exp.company)}{exp.location ? ` · ${exp.location}` : ""}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: exp.description ? 8 : 0 }}>
+                        {formatValue(exp.startDate ? new Date(exp.startDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : null)}
+                        {exp.endDate ? ` - ${new Date(exp.endDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` : exp.isCurrent ? " - Present" : ""}
+                      </div>
+                      {exp.description && <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>{exp.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{
               background: "var(--bg-3)", border: "1px solid var(--border)",
               borderRadius: 16, padding: "20px 22px",

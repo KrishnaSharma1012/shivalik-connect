@@ -14,8 +14,8 @@ export async function updateUserProfile(updatedData) {
 }
 
 // 🤝 Get all alumni (for networking)
-export async function getAlumni() {
-  const res = await API.get("/users/alumni");
+export async function getAlumni(params = {}) {
+  const res = await API.get("/users/alumni", { params });
   return res.data;
 }
 
@@ -23,4 +23,4 @@ export async function getAlumni() {
 export async function getUserById(id) {
   const res = await API.get(`/users/${id}`);
   return res.data;
-}
+}

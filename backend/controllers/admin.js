@@ -3,6 +3,13 @@ import Alumni from '../models/Alumni.js';
 import Admin from '../models/Admin.js';
 import Session from "../models/Session.js";
 import Course from "../models/Course.js";
+import {
+  countAllUsers,
+  countPremiumUsers,
+  countVerifiedUsers,
+  deleteUserById,
+  updateUserById,
+} from "../utils/userModels.js";
 
 // ─────────────────────────────
 // GET USERS
@@ -21,11 +28,11 @@ export const getUsers = async (req, res) => {
 // ─────────────────────────────
 export const verifyUser = async (req, res) => {
   try {
-    const user = await BaseUser.findByIdAndUpdate(
-      req.params.id,
-      { isVerified: true },
-      { new: true }
-    );
+    const user = await updateUserById(req.params.id, { isVerified: true });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.json({ message: "User verified", user });
   } catch (err) {
@@ -38,11 +45,11 @@ export const verifyUser = async (req, res) => {
 // ─────────────────────────────
 export const suspendUser = async (req, res) => {
   try {
-    const user = await BaseUser.findByIdAndUpdate(
-      req.params.id,
-      { isSuspended: true },
-      { new: true }
-    );
+    const user = await updateUserById(req.params.id, { isSuspended: true });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.json({ message: "User suspended", user });
   } catch (err) {
@@ -55,11 +62,11 @@ export const suspendUser = async (req, res) => {
 // ─────────────────────────────
 export const restoreUser = async (req, res) => {
   try {
-    const user = await BaseUser.findByIdAndUpdate(
-      req.params.id,
-      { isSuspended: false },
-      { new: true }
-    );
+    const user = await updateUserById(req.params.id, { isSuspended: false });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.json({ message: "User restored", user });
   } catch (err) {
@@ -72,7 +79,12 @@ export const restoreUser = async (req, res) => {
 // ─────────────────────────────
 export const deleteUser = async (req, res) => {
   try {
-    await BaseUser.findByIdAndDelete(req.params.id);
+    const deletedUser = await deleteUserById(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     res.json({ message: "User deleted" });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
@@ -84,7 +96,7 @@ export const deleteUser = async (req, res) => {
 // ─────────────────────────────
 export const getStats = async (req, res) => {
   try {
-    const users = await BaseUser.countDocuments();
+    const users = await countAllUsers();
     const sessions = await Session.countDocuments();
     const courses = await Course.countDocuments();
 
@@ -99,8 +111,8 @@ export const getStats = async (req, res) => {
 // ─────────────────────────────
 export const getAnalytics = async (req, res) => {
   try {
-    const verifiedUsers = await BaseUser.countDocuments({ isVerified: true });
-    const premiumUsers = await BaseUser.countDocuments({ alumniPlan: "premium" });
+    const verifiedUsers = await countVerifiedUsers();
+    const premiumUsers = await countPremiumUsers();
 
     res.json({ verifiedUsers, premiumUsers });
   } catch (err) {

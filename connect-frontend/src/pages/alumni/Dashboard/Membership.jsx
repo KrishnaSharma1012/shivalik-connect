@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
 import { motion, AnimatePresence } from "framer-motion";
@@ -144,7 +144,7 @@ export default function AlumniMembershipPage() {
   const isPremium = user?.alumniPlan === "premium";
 
   // Hooks must always be called before any conditional returns
-  const [membershipActive, setMembershipActive] = useState(true);
+  const [membershipActive, setMembershipActive] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [membershipData, setMembershipData] = useState({
@@ -232,10 +232,10 @@ export default function AlumniMembershipPage() {
       }
     };
 
-    if (isPremium) {
+    if (isPremium && membershipActive) {
       fetchMembershipData();
     }
-  }, [isPremium, user?.createdAt]);
+  }, [isPremium, membershipActive, user?.createdAt]);
 
   if (!isPremium) {
     return (

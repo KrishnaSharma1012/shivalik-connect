@@ -3,6 +3,11 @@ import Alumni from '../models/Alumni.js';
 import Admin from '../models/Admin.js';
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import {
+  findUserByEmail,
+  findUserById,
+  getUserModelByRole,
+} from "../utils/userModels.js";
 
 // ─────────────────────────────────────────────
 // IN-MEMORY OTP STORE (expires after 10 min)
@@ -36,7 +41,7 @@ export const signup = async (req, res) => {
       domain, city, country, joiningYear, passingYear, degree, branch
     } = req.body;
 
-    const existingUser = ((await Student.findOne({ email })) || (await Alumni.findOne({ email })) || (await Admin.findOne({ email })));
+    const existingUser = await findUserByEmail(email, { includePassword: true });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -62,7 +67,7 @@ export const signup = async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const fullUser = ((await Student.findById(user._id).select("-password")) || (await Alumni.findById(user._id).select("-password")) || (await Admin.findById(user._id).select("-password")));
+    const fullUser = await findUserById(user._id);
 
     res.status(201).json({ message: "Signup successful", user: fullUser, token });
   } catch (err) {
@@ -145,10 +150,16 @@ export const verifyOTP = (req, res) => {
 export const googleAuth = async (req, res) => {
   try {
     const { email, name, avatar, role } = req.body;
-    let user = await ((await Student.findOne({ email })) || (await Alumni.findOne({ email })) || (await Admin.findOne({ email })));
+     let user = await findUserByEmail(email, { includePassword: true });
     
     if (!user) {
-       user = await BaseUser.create({
+       const userModel = getUserModelByRole(role || "student");
+
+       if (!userModel) {
+        return res.status(400).json({ message: "Invalid user role" });
+       }
+
+       user = await userModel.create({
           name,
           email,
           avatar,
@@ -179,7 +190,7 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await ((await Student.findOne({ email })) || (await Alumni.findOne({ email })) || (await Admin.findOne({ email })));
+    const user = await findUserByEmail(email, { includePassword: true });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -199,7 +210,7 @@ export const login = async (req, res) => {
     });
 
     // ✅ Return FULL user profile so frontend doesn't lose fields like alumniPlan
-    const fullUser = await ((await Student.findById(user._id).select('-password')) || (await Alumni.findById(user._id).select('-password')) || (await Admin.findById(user._id).select('-password')));
+    const fullUser = await findUserById(user._id);
 
     res.json({
       message: "Login successful",
@@ -216,7 +227,7 @@ export const login = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getMe = async (req, res) => {
   try {
-    const user = await ((await Student.findById(req.user._id).select('-password')) || (await Alumni.findById(req.user._id).select('-password')) || (await Admin.findById(req.user._id).select('-password')));
+    const user = await findUserById(req.user._id);
 
     res.json({ user });
   } catch (err) {

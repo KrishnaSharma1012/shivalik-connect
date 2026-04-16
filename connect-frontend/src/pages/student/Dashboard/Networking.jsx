@@ -20,7 +20,7 @@ export default function Networking() {
   useEffect(() => {
     const fetchAlumni = async () => {
       try {
-        const data = await getAlumni();
+        const data = await getAlumni(hasSearch ? { name: search.trim() } : {});
         setAlumniList(data.alumni || []);
       } catch (err) {
         console.error("Networking fetch error", err);
@@ -29,8 +29,10 @@ export default function Networking() {
         setLoading(false);
       }
     };
-    fetchAlumni();
-  }, []);
+    const timer = setTimeout(fetchAlumni, 250);
+
+    return () => clearTimeout(timer);
+  }, [hasSearch, search]);
 
   const normalize = (value = "") =>
     value
@@ -72,13 +74,6 @@ export default function Networking() {
   };
 
   const suggestedAlumni = [...alumniList].sort((a, b) => scoreAlumni(b) - scoreAlumni(a));
-
-  const filtered = alumniList.filter(a => {
-    const matchSearch  = a.name?.toLowerCase().includes(search.toLowerCase()) ||
-                         a.role?.toLowerCase().includes(search.toLowerCase()) ||
-                         a.company?.toLowerCase().includes(search.toLowerCase());
-    return matchSearch;
-  });
 
   return (
     <MainLayout>
@@ -142,7 +137,7 @@ export default function Networking() {
         )}
 
         {/* Alumni list */}
-        {hasSearch && filtered.length === 0 ? (
+        {hasSearch && !loading && alumniList.length === 0 ? (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             background: "var(--bg-3)", border: "1px solid var(--border)",
@@ -158,7 +153,7 @@ export default function Networking() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(hasSearch ? filtered : suggestedAlumni).map((alumni, i) => (
+            {(hasSearch ? alumniList : suggestedAlumni).map((alumni, i) => (
               <div key={alumni._id || alumni.id} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 50}ms` }}>
                 <AlumniCard alumni={alumni} />
               </div>

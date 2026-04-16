@@ -1,18 +1,25 @@
-import Student from '../models/Student.js';
 import Alumni from '../models/Alumni.js';
-import Admin from '../models/Admin.js';
 import Course from "../models/Course.js";
 import Session from "../models/Session.js";
 import { uploadImage } from "../config/cloudinary.js";
+import {
+  findUserById,
+  getUserModelByRole,
+} from "../utils/userModels.js";
 
 // ─────────────────────────────────────────────
 // GET ALUMNI
 // ─────────────────────────────────────────────
 export const getAlumni = async (req, res) => {
   try {
-    const { college, isPremium, has24h, page = 1, limit = 12 } = req.query;
+    const { name, college, isPremium, has24h, page = 1, limit = 12 } = req.query;
 
-    const filter = { role: "alumni", isSuspended: { $ne: true } };
+    const filter = { isSuspended: { $ne: true } };
+
+    if (name) {
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.name = { $regex: escapedName, $options: "i" };
+    }
 
     if (college) {
       filter.college = { $regex: college, $options: "i" };
@@ -27,9 +34,9 @@ export const getAlumni = async (req, res) => {
     }
 
     const skip = (Number(page) - 1) * Number(limit);
-    const total = await BaseUser.countDocuments(filter);
+    const total = await Alumni.countDocuments(filter);
 
-    const alumni = await BaseUser.find(filter)
+    const alumni = await Alumni.find(filter)
       .select(
         "name email college company avatar about skills alumniPlan isVerified has24hReply isCollegePartner"
       )
@@ -53,7 +60,7 @@ export const getAlumni = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getUserById = async (req, res) => {
   try {
-    const user = await ((await Student.findById(req.params.id).select('-password')) || (await Alumni.findById(req.params.id).select('-password')) || (await Admin.findById(req.params.id).select('-password')));
+    const user = await findUserById(req.params.id);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -103,11 +110,19 @@ export const updateProfile = async (req, res) => {
       updates.coverPhoto = url;
     }
 
-    const user = await BaseUser.findByIdAndUpdate(
-      req.user._id,
-      { $set: updates },
-      { new: true, runValidators: true }
-    ).select("-password");
+    const userModel = getUserModelByRole(req.user.role);
+
+    if (!userModel) {
+      return res.status(400).json({ message: "Unsupported user role" });
+    }
+
+    const user = await userModel
+      .findByIdAndUpdate(
+        req.user._id,
+        { $set: updates },
+        { new: true, runValidators: true }
+      )
+      .select("-password");
 
     res.json({ message: "Profile updated", user });
   } catch (err) {
@@ -132,7 +147,7 @@ export const upgradePlan = async (req, res) => {
       return res.status(400).json({ message: "Invalid plan" });
     }
 
-    const user = await BaseUser.findByIdAndUpdate(
+    const user = await Alumni.findByIdAndUpdate(
       req.user._id,
       { alumniPlan: plan },
       { new: true }

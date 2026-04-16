@@ -87,6 +87,7 @@ export const createPost = async (req, res) => {
 
     const post = await Post.create({
       author: req.user._id,
+      authorModel: req.user.role === "student" ? "Student" : req.user.role === "alumni" ? "Alumni" : "Admin",
       content: content.trim(),
       media: uploadedMedia,
       tags,
@@ -112,16 +113,25 @@ export const toggleLike = async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userId = req.user._id;
+    const userModel = req.user.role === "student" ? "Student" : req.user.role === "alumni" ? "Alumni" : "Admin";
 
-    // ✅ FIX ObjectId comparison
-    const alreadyLiked = post.likes.some(
-      (id) => id.toString() === userId.toString()
-    );
+    const alreadyLiked = post.likes.some((like) => {
+      // Backward compatibility if old docs store plain ObjectId
+      if (like?.toString && !like.user) {
+        return like.toString() === userId.toString();
+      }
+      return like?.user?.toString() === userId.toString();
+    });
 
     if (alreadyLiked) {
-      post.likes.pull(userId);
+      post.likes = post.likes.filter((like) => {
+        if (like?.toString && !like.user) {
+          return like.toString() !== userId.toString();
+        }
+        return like?.user?.toString() !== userId.toString();
+      });
     } else {
-      post.likes.push(userId);
+      post.likes.push({ user: userId, userModel });
     }
 
     await post.save();
@@ -151,6 +161,7 @@ export const addComment = async (req, res) => {
 
     const comment = {
       author: req.user._id,
+      authorModel: req.user.role === "student" ? "Student" : req.user.role === "alumni" ? "Alumni" : "Admin",
       content: content.trim(),
     };
 
