@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
+import Loader from "../../../components/common/Loader";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
@@ -147,6 +148,7 @@ export default function AlumniMembershipPage() {
   const [membershipActive, setMembershipActive] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(false);
   const [membershipData, setMembershipData] = useState({
     startDate: "-",
     renewDate: "-",
@@ -166,6 +168,7 @@ export default function AlumniMembershipPage() {
     const formatMoney = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 
     const fetchMembershipData = async () => {
+      setLoading(true);
       try {
         const [statsRes, conversationsRes] = await Promise.all([
           API.get("/earnings/stats"),
@@ -229,6 +232,8 @@ export default function AlumniMembershipPage() {
         });
       } catch (err) {
         console.error("Membership fetch error", err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -408,16 +413,18 @@ export default function AlumniMembershipPage() {
           {/* ─── ACTIVE STATE ─── */}
           {membershipActive && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              {loading && <Loader text="Loading membership data..." />}
+
               {/* Tab navigation */}
-              <div style={{ display: "flex", gap: 4, marginBottom: 24, padding: 4, background: "var(--bg-3)", borderRadius: 12, border: "1px solid var(--border)", width: "fit-content" }}>
+              {!loading && <div style={{ display: "flex", gap: 4, marginBottom: 24, padding: 4, background: "var(--bg-3)", borderRadius: 12, border: "1px solid var(--border)", width: "fit-content" }}>
                 {["overview", "subscribers", "revenue"].map(tab => (
                   <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "8px 20px", borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "Plus Jakarta Sans", background: activeTab === tab ? "linear-gradient(135deg,#00E5C3,#0A8FE8)" : "transparent", color: activeTab === tab ? "white" : "var(--text-3)", transition: "all 0.2s", textTransform: "capitalize", boxShadow: activeTab === tab ? "0 4px 14px rgba(0,229,195,0.3)" : "none" }}>
                     {tab}
                   </button>
                 ))}
-              </div>
+              </div>}
 
-              <AnimatePresence mode="wait">
+              {!loading && <AnimatePresence mode="wait">
                 {activeTab === "overview" && (
                   <motion.div key="overview" initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 15 }} transition={{ duration: 0.3 }}>
                     {/* Stats row */}
@@ -546,15 +553,15 @@ export default function AlumniMembershipPage() {
                     </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
+              </AnimatePresence>}
 
               {/* Membership status */}
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ marginTop: 24, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              {!loading && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ marginTop: 24, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Membership Status</div>
                   <p style={{ fontSize: 12, color: "var(--text-3)" }}>Your membership auto-renews on {membershipData.renewDate}. Students can subscribe anytime.</p>
                 </div>
-              </motion.div>
+              </motion.div>}
             </motion.div>
           )}
         </motion.div>

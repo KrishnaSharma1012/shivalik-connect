@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniCard from "../../../components/networking/AlumniCard";
+import Loader from "../../../components/common/Loader";
 import { useAuth } from "../../../context/AuthContext";
 import { getAlumni } from "../../../services/userService";
 
@@ -19,6 +20,7 @@ export default function Networking() {
 
   useEffect(() => {
     const fetchAlumni = async () => {
+      setLoading(true);
       try {
         const data = await getAlumni(hasSearch ? { name: search.trim() } : {});
         setAlumniList(data.alumni || []);
@@ -137,7 +139,9 @@ export default function Networking() {
         )}
 
         {/* Alumni list */}
-        {hasSearch && !loading && alumniList.length === 0 ? (
+        {loading ? (
+          <Loader text={hasSearch ? "Searching alumni..." : "Loading alumni..."} />
+        ) : hasSearch && alumniList.length === 0 ? (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             background: "var(--bg-3)", border: "1px solid var(--border)",

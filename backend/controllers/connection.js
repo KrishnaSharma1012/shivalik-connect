@@ -1,7 +1,11 @@
 import Connection from "../models/Connection.js";
-import Student from '../models/Student.js';
 import Alumni from '../models/Alumni.js';
-import Admin from '../models/Admin.js';
+
+const roleToModel = {
+  student: "Student",
+  alumni: "Alumni",
+  admin: "Admin",
+};
 
 // ─────────────────────────────────────────────
 // SEND REQUEST
@@ -10,13 +14,18 @@ export const sendRequest = async (req, res) => {
   try {
     const alumniId = req.params.id; // ✅ FIX
     const studentId = req.user._id;
+    const fromModel = roleToModel[req.user.role];
 
     if (studentId.toString() === alumniId) {
       return res.status(400).json({ message: "Cannot connect with yourself" });
     }
 
-    const alumni = await ((await Student.findById(alumniId)) || (await Alumni.findById(alumniId)) || (await Admin.findById(alumniId)));
-    if (!alumni || alumni.role !== "alumni") {
+    if (!fromModel) {
+      return res.status(400).json({ message: "Invalid user role" });
+    }
+
+    const alumni = await Alumni.findById(alumniId);
+    if (!alumni) {
       return res.status(404).json({ message: "Alumni not found" });
     }
 
@@ -38,14 +47,21 @@ export const sendRequest = async (req, res) => {
 
     const connection = await Connection.create({
       from: studentId,
+      fromModel,
       to: alumniId,
+      toModel: "Alumni",
       status: "pending",
     });
 
-    await connection.populate("from", "name avatar role college");
-    await connection.populate("to", "name avatar role company");
-
-    res.status(201).json({ message: "Connection request sent", connection });
+    res.status(201).json({
+      message: "Connection request sent",
+      connection: {
+        _id: connection._id,
+        from: connection.from,
+        to: connection.to,
+        status: connection.status,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }

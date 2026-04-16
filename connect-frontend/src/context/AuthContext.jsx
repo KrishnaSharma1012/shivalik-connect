@@ -11,14 +11,28 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch {
+          localStorage.removeItem("user");
+        }
+      }
+
       if (token) {
         try {
           const data = await getCurrentUser();
-          setUser(data.user || data);
+          const resolvedUser = data.user || data;
+          setUser(resolvedUser);
+          localStorage.setItem("user", JSON.stringify(resolvedUser));
         } catch (err) {
           console.error("Auth initialization failed", err);
           localStorage.removeItem("token");
           localStorage.removeItem("userId");
+          localStorage.removeItem("user");
+          setUser(null);
         }
       }
       setLoading(false);
@@ -29,6 +43,9 @@ export function AuthProvider({ children }) {
   // 🔐 Login
   const login = (userData) => {
     setUser(userData);
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
   };
 
   // 🚪 Logout
@@ -43,7 +60,9 @@ export function AuthProvider({ children }) {
   const updateUser = async (updatedData) => {
     try {
       const data = await updateUserProfile(updatedData);
-      setUser(data.user || data);
+      const resolvedUser = data.user || data;
+      setUser(resolvedUser);
+      localStorage.setItem("user", JSON.stringify(resolvedUser));
       return data;
     } catch (err) {
       console.error("Profile update failed", err);

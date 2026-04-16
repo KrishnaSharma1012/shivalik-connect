@@ -4,6 +4,7 @@ import MainLayout from "../../../components/layout/MainLayout";
 import CreatePost from "../../../components/feed/CreatePost";
 import PostCard from "../../../components/feed/PostCard";
 import CrownIcon from "../../../components/common/CrownIcon";
+import Loader from "../../../components/common/Loader";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
 
@@ -12,18 +13,22 @@ export default function AlumniFeed() {
   const navigate = useNavigate();
   const isPremium = user?.alumniPlan === "premium";
   const [posts, setPosts] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     fetchPosts();
   }, []);
 
   const fetchPosts = async () => {
+    setLoading(true);
     try {
       const res = await API.get("/posts");
       setPosts(res.data.posts || []);
     } catch(err) {
       console.error(err);
       setPosts([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,6 +113,14 @@ export default function AlumniFeed() {
         <CreatePost onAddPost={addPost} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {loading && <Loader text="Loading posts..." />}
+
+          {!loading && posts.length === 0 && (
+            <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-3)", fontSize: 14 }}>
+              No posts yet.
+            </div>
+          )}
+
           {posts.map((post, i) => (
             <div key={post._id || post.id || i} style={{ animation: "fadeUp 0.35s ease both", animationDelay: `${i * 60}ms` }}>
               <PostCard post={post} />

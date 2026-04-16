@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
 import PostCard from "../../../components/feed/PostCard";
+import Loader from "../../../components/common/Loader";
 import { getPosts } from "../../../services/feedService";
 
 const FilterTabs = ["All", "Connected", "Trending", "Current Activity"];
@@ -57,18 +58,26 @@ export default function Feed() {
         </div>
 
         {/* FILTER TABS */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
           {FilterTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                padding: "6px 14px",
-                borderRadius: 20,
-                background: activeTab === tab ? "#7C5CFC" : "#eee",
-                color: activeTab === tab ? "white" : "#555",
-                border: "none",
+                padding: "7px 18px",
+                borderRadius: 99,
+                flexShrink: 0,
+                background: activeTab === tab
+                  ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)"
+                  : "var(--bg-3)",
+                border: `1px solid ${activeTab === tab ? "transparent" : "var(--border)"}`,
+                color: activeTab === tab ? "white" : "var(--text-2)",
+                fontSize: 13,
+                fontWeight: activeTab === tab ? 700 : 500,
+                fontFamily: activeTab === tab ? "Plus Jakarta Sans" : "DM Sans",
                 cursor: "pointer",
+                transition: "all 0.2s",
+                boxShadow: activeTab === tab ? "0 4px 14px rgba(124,92,252,0.3)" : "none",
               }}
             >
               {tab}
@@ -77,7 +86,7 @@ export default function Feed() {
         </div>
 
         {/* LOADING */}
-        {loading && <p>Loading posts...</p>}
+        {loading && <Loader text="Loading posts..." />}
 
         {/* POSTS */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import CrownIcon from "../../../components/common/CrownIcon";
+import Loader from "../../../components/common/Loader";
 import { useLocation } from "react-router-dom";
 import { getConversations, getMessages, sendMessage } from "../../../services/chatService";
 
@@ -50,10 +51,13 @@ export default function StudentMessages() {
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [input, setInput] = useState("");
   const bottomRef = useRef();
 
   const fetchConversations = async () => {
+    setConversationsLoading(true);
     try {
       const data = await getConversations();
       const formatted = (data.conversations || []).map(c => ({
@@ -89,7 +93,12 @@ export default function StudentMessages() {
       } else if (formatted.length > 0 && !activeChat) {
         setActiveChat(formatted[0]);
       }
-    } catch(err) { console.error(err); }
+    } catch(err) {
+      console.error(err);
+      setConversations([]);
+    } finally {
+      setConversationsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -97,6 +106,7 @@ export default function StudentMessages() {
   }, [location.search]);
 
   const fetchMessages = async (userId) => {
+    setMessagesLoading(true);
     try {
       const data = await getMessages(userId);
       const formatted = (data.messages || []).map(m => ({
@@ -105,7 +115,12 @@ export default function StudentMessages() {
          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
       }));
       setMessages(formatted);
-    } catch(err) { console.error(err); }
+    } catch(err) {
+      console.error(err);
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -145,6 +160,8 @@ export default function StudentMessages() {
           </div>
 
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {conversationsLoading && <Loader text="Loading conversations..." />}
+
             {membershipChats.length > 0 && (
               <>
                 <div style={{ padding: "8px 14px 6px", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#FFB830" }}>
@@ -165,6 +182,12 @@ export default function StudentMessages() {
                   <ConversationItem key={chat.id} chat={chat} active={activeChat?.id === chat.id} onClick={setActiveChat} />
                 ))}
               </>
+            )}
+
+            {!conversationsLoading && conversations.length === 0 && (
+              <div style={{ padding: "18px 14px", color: "var(--text-3)", fontSize: 12 }}>
+                No conversations yet.
+              </div>
             )}
           </div>
         </div>
@@ -187,6 +210,8 @@ export default function StudentMessages() {
             </div>
 
             <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {messagesLoading && <Loader text="Loading messages..." />}
+
               {messages.map((msg, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: msg.sender === "me" ? "flex-end" : "flex-start" }}>
                   <div style={{ maxWidth: "68%", padding: "10px 14px", borderRadius: msg.sender === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.sender === "me" ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)" : "var(--bg-4)", border: msg.sender === "me" ? "none" : "1px solid var(--border)", color: msg.sender === "me" ? "white" : "var(--text)", fontSize: 14, lineHeight: 1.5 }}>

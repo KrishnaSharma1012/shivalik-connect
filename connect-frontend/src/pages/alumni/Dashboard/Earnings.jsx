@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import AlumniModelGate from "../../../components/common/AlumniModelGate";
+import Loader from "../../../components/common/Loader";
 import { useAuth } from "../../../context/AuthContext";
 import API from "../../../utils/api";
 
@@ -138,9 +139,7 @@ export default function Earnings() {
             </div>
 
             {loading && (
-              <div style={{ padding: "32px", textAlign: "center", color: "var(--text-3)", fontSize: 14 }}>
-                Loading transactions…
-              </div>
+              <Loader text="Loading transactions..." />
             )}
 
             {!loading && transactions.length === 0 && (

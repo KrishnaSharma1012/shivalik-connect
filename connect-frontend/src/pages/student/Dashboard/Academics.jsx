@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import { CourseCard } from "../../../components/academics/CourseCard";
 import { SessionCard } from "../../../components/academics/CourseCard";
+import Loader from "../../../components/common/Loader";
 import { getCourses, getSessions } from "../../../services/courseService";
 
 const TABS = ["All", "Courses", "Live Sessions", "Workshops"];
@@ -10,9 +11,11 @@ export default function Academics() {
   const [activeTab, setActiveTab] = useState("All");
   const [COURSES, setCourses] = useState([]);
   const [SESSIONS, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCatalog = async () => {
+      setLoading(true);
       try {
         const [coursesData, sessionsData] = await Promise.all([
           getCourses(),
@@ -50,6 +53,8 @@ export default function Academics() {
         setSessions(mappedSessions);
       } catch (err) {
         console.error("Academics fetch error", err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchCatalog();
@@ -88,8 +93,10 @@ export default function Academics() {
           ))}
         </div>
 
+        {loading && <Loader text="Loading courses and sessions..." />}
+
         {/* Courses */}
-        {showCourses && (
+        {!loading && showCourses && (
           <div style={{ marginBottom: 40 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>
@@ -108,7 +115,7 @@ export default function Academics() {
         )}
 
         {/* Sessions */}
-        {showSessions && (
+        {!loading && showSessions && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>

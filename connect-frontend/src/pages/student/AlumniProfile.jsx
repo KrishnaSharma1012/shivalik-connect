@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
 import CrownIcon from "../../components/common/CrownIcon";
+import Loader from "../../components/common/Loader";
 import PostCard from "../../components/feed/PostCard";
 import PaymentModal from "../../components/academics/PaymentModal";
 import API from "../../utils/api";
@@ -166,7 +167,7 @@ export default function StudentAlumniProfile() {
     return (
       <MainLayout>
         <div style={{ maxWidth: 720, margin: "60px auto", textAlign: "center", color: "var(--text-3)" }}>
-          Loading alumni profile...
+          <Loader text="Loading alumni profile..." />
         </div>
       </MainLayout>
     );

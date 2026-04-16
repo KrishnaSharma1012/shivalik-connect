@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
+import Loader from "../../components/common/Loader";
 import courseThumbnail from "../../assets/hero.png";
 import API from "../../utils/api";
 
@@ -56,7 +57,7 @@ export default function MyLearning() {
 
         {loading ? (
           <div style={sectionStyle}>
-            <p style={{ color: "var(--text-3)", textAlign: "center", padding: "40px 0" }}>Loading your enrollments...</p>
+            <Loader text="Loading your enrollments..." />
           </div>
         ) : items.length === 0 ? (
           <div style={sectionStyle}>
