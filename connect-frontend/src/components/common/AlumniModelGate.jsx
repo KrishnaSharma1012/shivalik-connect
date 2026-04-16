@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import API from "../../utils/api";
 import CrownIcon from "./CrownIcon";
 
 // ── Layout constants — adjust to match your MainLayout ───────────────────────
@@ -53,21 +54,19 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
     }
 
     try {
-      // Try profile update first
       await updateUser({ alumniPlan: "premium" });
       alert("🎉 You are now a Premium member!");
       window.location.reload();
     } catch (err1) {
       console.error("Profile update failed, trying upgrade-plan endpoint", err1);
       try {
-        // Fallback to dedicated upgrade endpoint
-        const API = (await import("../../utils/api")).default;
         await API.patch("/users/upgrade-plan", { plan: "premium" });
         alert("🎉 You are now a Premium member!");
         window.location.reload();
       } catch (err2) {
         console.error("Upgrade failed", err2);
-        alert("Upgrade failed. Please try again.");
+        const errMsg = err2?.response?.data?.message || err2.message || "Unknown error";
+        alert("Upgrade failed. Details: " + errMsg);
       }
     }
   };
@@ -87,14 +86,16 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
           left: SIDEBAR_WIDTH,
           right: 0,
           bottom: 0,
-          zIndex: 90,
+          zIndex: 9999, // Ensure it's on top of everything
           background: "rgba(8,9,14,0.75)",
           backdropFilter: "blur(4px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
+          pointerEvents: "auto", // Explicitly enable clicks
         }}
+        onClick={(e) => e.stopPropagation()} // Prevent any parent handlers
       >
         <div
           style={{
@@ -167,6 +168,8 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
               cursor: "pointer",
               boxShadow: "0 4px 16px rgba(255,112,67,0.4)",
               transition: "opacity 0.2s",
+              position: "relative",
+              zIndex: 10,
             }}
             onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
             onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
@@ -176,7 +179,6 @@ export default function AlumniModelGate({ isPremium, children, featureName = "th
           </button>
         </div>
       </div>
-
     </>
   );
 }

@@ -23,9 +23,6 @@ router.get("/alumni", getAlumni);
 // ─────────────────────────────
 router.use(protect);
 
-// Get single user profile
-router.get("/:id", getUserById);
-
 // Update profile (includes avatar upload already)
 router.put("/profile", updateProfile);
 
@@ -34,5 +31,8 @@ router.patch("/upgrade-plan", upgradePlan);
 
 // Get enrolled items (courses + sessions)
 router.get("/me/enrolled", getEnrolledItems);
+
+// Get single user profile (MUST be last route so it doesn't match the above endpoints)
+router.get("/:id", getUserById);
 
 export default router;

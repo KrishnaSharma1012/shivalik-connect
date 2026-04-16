@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import API from "../../utils/api";
 import CrownIcon from "../common/CrownIcon";
 
 const icons = {
@@ -63,7 +64,7 @@ const allNavItems = [
 export default function AlumniSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   // Read from the correct field set during signup
   const isPremium = user?.alumniPlan === "premium";
 
@@ -217,9 +218,30 @@ export default function AlumniSidebar() {
           }}
           onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-          onClick={() => navigate("/alumni/dashboard/sessions")}
+          onClick={async () => {
+            if (!user || user.role !== "alumni") {
+              navigate("/signup", { state: { role: "alumni", plan: "premium" } });
+              return;
+            }
+            try {
+              await updateUser({ alumniPlan: "premium" });
+              alert("🎉 You are now a Premium member!");
+              window.location.reload();
+            } catch (err1) {
+              console.error("Profile update failed", err1);
+              try {
+                await API.patch("/users/upgrade-plan", { plan: "premium" });
+                alert("🎉 You are now a Premium member!");
+                window.location.reload();
+              } catch (err2) {
+                console.error("Upgrade failed", err2);
+                const errMsg = err2?.response?.data?.message || err2.message || "Unknown error";
+                alert("Upgrade failed. Details: " + errMsg);
+              }
+            }
+          }}
           >
-            Go Premium →
+            Go Premium — ₹499 →
           </button>
         </div>
       )}

@@ -63,7 +63,8 @@ export default function AlumniFeed() {
         window.location.reload();
       } catch (err2) {
         console.error("Upgrade failed", err2);
-        alert("Upgrade failed. Please try again.");
+        const errMsg = err2?.response?.data?.message || err2.message || "Unknown error";
+        alert("Upgrade failed. Details: " + errMsg);
       }
     }
   };
