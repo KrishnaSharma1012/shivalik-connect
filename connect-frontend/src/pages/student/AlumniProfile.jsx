@@ -56,6 +56,9 @@ export default function StudentAlumniProfile() {
   const [membershipTaken, setMembershipTaken] = useState(false);
   const [showMembershipPayment, setShowMembershipPayment] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     if (alumni) {
@@ -121,6 +124,23 @@ export default function StudentAlumniProfile() {
       console.error(err);
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (reviewRating < 1) return alert("Please select a rating!");
+    setSubmittingReview(true);
+    try {
+      const res = await API.post(`/users/${alumniId}/review`, { rating: reviewRating, comment: reviewComment });
+      setAlumni(prev => ({ ...prev, reviews: res.data.reviews }));
+      setReviewRating(0);
+      setReviewComment("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit review");
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -439,14 +459,14 @@ export default function StudentAlumniProfile() {
             }}>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Profile Details</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                {detailRows.map((row) => (
+                {detailRows.filter(row => row.value && row.value !== "—" && row.value !== "").map((row) => (
                   <div key={row.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 5 }}>
                       <InfoIcon />
                       {row.label}
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.5 }}>
-                      {formatValue(row.value)}
+                      {row.value}
                     </div>
                   </div>
                 ))}
@@ -585,6 +605,56 @@ export default function StudentAlumniProfile() {
         {/* Reviews tab */}
         {activeTab === "Reviews" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s ease" }}>
+            
+            {/* Leave a review form */}
+            <form onSubmit={handleReviewSubmit} style={{
+              background: "var(--bg-3)", border: "1px solid var(--border)",
+              borderRadius: 16, padding: "20px 22px", marginBottom: 12,
+            }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>Leave a Review</h3>
+              
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    type="button"
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    style={{
+                      background: "none", border: "none", fontSize: 24, cursor: "pointer",
+                      color: reviewRating >= star ? "#F5C842" : "var(--border)", transition: "color 0.2s"
+                    }}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              
+              <textarea
+                placeholder="Share your experience (optional)..."
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                style={{
+                  width: "100%", minHeight: 80, padding: 14, borderRadius: 12,
+                  background: "var(--bg-2)", border: "1px solid var(--border)",
+                  color: "var(--text)", fontFamily: "DM Sans", fontSize: 13,
+                  resize: "vertical", marginBottom: 16, boxSizing: "border-box"
+                }}
+              />
+              
+              <button
+                type="submit"
+                disabled={submittingReview}
+                style={{
+                  padding: "10px 20px", borderRadius: 10, border: "none",
+                  background: "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
+                  color: "white", fontSize: 13, fontWeight: 700, fontFamily: "Plus Jakarta Sans",
+                  cursor: submittingReview ? "not-allowed" : "pointer", opacity: submittingReview ? 0.7 : 1
+                }}
+              >
+                {submittingReview ? "Submitting..." : "Submit Review"}
+              </button>
+            </form>
+
             {reviews.length === 0 ? (
               <div style={{ textAlign: "center", padding: "44px 20px", background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 16 }}>
                 <p style={{ fontSize: 34, marginBottom: 10 }}>⭐</p>
@@ -597,10 +667,10 @@ export default function StudentAlumniProfile() {
                   borderRadius: 14, padding: "16px 20px",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{r.author?.name || "Student"}</span>
+                    <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{r.student?.name || "Student"}</span>
                     <span style={{ color: "#F5C842", fontSize: 13 }}>{"⭐".repeat(Number(r.rating || 0))}</span>
                   </div>
-                  <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6 }}>{r.text || r.comment}</p>
+                  <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6 }}>{r.text || r.reviewText || r.comment}</p>
                 </div>
               ))
             )}

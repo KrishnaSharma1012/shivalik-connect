@@ -5,6 +5,7 @@ import {
   updateProfile,
   upgradePlan,
   getEnrolledItems,
+  addReview,
 } from "../controllers/user.js";
 
 import { protect } from "../middleware/auth.js";
@@ -28,6 +29,9 @@ router.put("/profile", updateProfile);
 
 // Upgrade alumni plan (simple → premium)
 router.patch("/upgrade-plan", upgradePlan);
+
+// Add review to an alumni
+router.post("/:id/review", addReview);
 
 // Get enrolled items (courses + sessions)
 router.get("/me/enrolled", getEnrolledItems);

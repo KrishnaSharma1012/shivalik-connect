@@ -191,3 +191,55 @@ export const getEnrolledItems = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+// ─────────────────────────────────────────────
+// ADD REVIEW TO ALUMNI
+// ─────────────────────────────────────────────
+export const addReview = async (req, res) => {
+  try {
+    const { id } = req.params; // Alumni ID
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Valid rating between 1 and 5 is required." });
+    }
+
+    const alumni = await Alumni.findById(id);
+    if (!alumni) {
+      return res.status(404).json({ message: "Alumni not found" });
+    }
+
+    // Check if student already left a review
+    const existingIndex = alumni.reviews.findIndex(r => r.student?.toString() === req.user._id.toString());
+    
+    if (existingIndex > -1) {
+      // Update existing
+      alumni.reviews[existingIndex].rating = rating;
+      alumni.reviews[existingIndex].reviewText = comment;
+      alumni.reviews[existingIndex].date = Date.now();
+    } else {
+      // Create new
+      alumni.reviews.push({
+        student: req.user._id,
+        rating,
+        reviewText: comment,
+      });
+    }
+
+    await alumni.save();
+
+    // Re-fetch populated reviews
+    const updatedAlumni = await Alumni.findById(id).populate({
+      path: "reviews.student",
+      select: "name avatar headline role",
+    });
+
+    res.status(201).json({
+      message: "Review submitted successfully",
+      reviews: updatedAlumni.reviews,
+    });
+  } catch (err) {
+    console.error("Add review error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
