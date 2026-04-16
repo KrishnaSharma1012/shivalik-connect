@@ -22,6 +22,15 @@ const userSchema = new mongoose.Schema({
   college: String,
   company: String,
 
+  // Extra Alumni details
+  domain: String,
+  city: String,
+  country: String,
+  joiningYear: Number,
+  passingYear: Number,
+  degree: String,
+  branch: String,
+
   alumniPlan: {
     type: String,
     enum: ["simple", "premium"],

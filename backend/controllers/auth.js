@@ -29,7 +29,10 @@ const generateToken = (userId) => {
 // ─────────────────────────────
 export const signup = async (req, res) => {
   try {
-    const { name, email, password, role, college, company, alumniPlan } = req.body;
+    const {
+      name, email, password, role, college, company, alumniPlan,
+      domain, city, country, joiningYear, passingYear, degree, branch
+    } = req.body;
 
     // 🔍 check existing user
     const existingUser = await BaseUser.findOne({ email });
@@ -44,6 +47,9 @@ export const signup = async (req, res) => {
       college: college || "",
       company: company || "",
       alumniPlan: role === "alumni" ? (alumniPlan || "simple") : undefined,
+      domain, city, country,
+      joiningYear, passingYear,
+      degree, branch
     });
 
     // ✅ generate token

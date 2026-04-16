@@ -89,6 +89,9 @@ export default function Signup() {
     role: routeState.role || "",
     college: "", company: "",
     alumniPlan: routeState.plan || "simple",
+    domain: "", city: "", country: "",
+    joiningYear: "", passingYear: "",
+    degree: "", branch: ""
   });
   const [roleLocked] = useState(!!routeState.role);
   const [error, setError]   = useState("");
@@ -229,8 +232,13 @@ export default function Signup() {
       const payload = {
         name: form.name, email: form.email,
         password: form.password, role: form.role,
-        college: form.college, company: form.company,
+        college: form.college,
+        company: form.role === "alumni" ? form.company : undefined,
         alumniPlan: overridePlan || form.alumniPlan,
+        domain: form.domain,
+        city: form.city, country: form.country,
+        joiningYear: form.joiningYear, passingYear: form.passingYear,
+        degree: form.degree, branch: form.branch
       };
       const data = await signupUser(payload);
       localStorage.setItem("token", data.token);
@@ -469,19 +477,63 @@ export default function Signup() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>
-                    {form.role === "student" ? "College Name" : "Current Company"}
-                  </label>
+                  <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>College Name</label>
                   <input className="dark-input" list="collegeList"
-                    placeholder={form.role === "student" ? "Search or enter your college" : "e.g. Google, Amazon…"}
-                    value={form.role === "student" ? form.college : form.company}
-                    onChange={e => set(form.role === "student" ? "college" : "company", e.target.value)} />
+                    placeholder="Search or enter your college"
+                    value={form.college}
+                    onChange={e => set("college", e.target.value)} />
                   <datalist id="collegeList">
-                    {TECHNICAL_COLLEGES.map((col, idx) => (
-                      <option key={idx} value={col} />
-                    ))}
+                    {TECHNICAL_COLLEGES.map((col, idx) => <option key={idx} value={col} />)}
                   </datalist>
                 </div>
+
+                {form.role === "alumni" && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Current Company</label>
+                        <input className="dark-input" placeholder="e.g. Google" value={form.company} onChange={e => set("company", e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Domain / Role</label>
+                        <input className="dark-input" placeholder="e.g. Software Engineer" value={form.domain} onChange={e => set("domain", e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Degree</label>
+                        <input className="dark-input" placeholder="e.g. B.Tech" value={form.degree} onChange={e => set("degree", e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Branch</label>
+                        <input className="dark-input" placeholder="e.g. Computer Science" value={form.branch} onChange={e => set("branch", e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Joining Year</label>
+                        <input type="number" className="dark-input" placeholder="YYYY" value={form.joiningYear} onChange={e => set("joiningYear", e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Passing Year</label>
+                        <input type="number" className="dark-input" placeholder="YYYY" value={form.passingYear} onChange={e => set("passingYear", e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>City</label>
+                        <input className="dark-input" placeholder="e.g. Bengaluru" value={form.city} onChange={e => set("city", e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Country</label>
+                        <input className="dark-input" placeholder="e.g. India" value={form.country} onChange={e => set("country", e.target.value)} />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: "var(--text-2)", fontWeight: 500, marginBottom: 7 }}>Password</label>
