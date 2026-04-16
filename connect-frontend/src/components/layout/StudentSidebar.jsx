@@ -47,6 +47,7 @@ const icons = {
 };
 
 const navItems = [
+  { name: "CareerPath", label: "Career Path", path: "/career-path" },
   { name: "Feed",       path: "/feed"        },
   { name: "Networking", path: "/networking"  },
   { name: "Academics",  path: "/academics"   },

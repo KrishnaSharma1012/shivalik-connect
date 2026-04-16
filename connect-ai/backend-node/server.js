@@ -8,6 +8,7 @@ const Groq    = require("groq-sdk");
 const app = express();
 app.use(cors());
 app.use(express.json());
+const PYTHON_AI_URL = (process.env.PYTHON_AI_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 // ─── MongoDB ──────────────────────────────────────────────────────────────────
 let db;
@@ -200,7 +201,7 @@ app.post("/chat", async (req, res) => {
 
   if (!isLandingPublicMode && intent === "career") {
     try {
-      const aiRes = await axios.post("http://localhost:8000/analyze", {
+      const aiRes = await axios.post(`${PYTHON_AI_URL}/analyze`, {
         message, user_skills: userSkills,
       });
       dataContext = `\n\n=== CAREER DATA FROM DATABASE ===\n${JSON.stringify(aiRes.data, null, 2)}`;

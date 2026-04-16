@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
 import re
+from pathlib import Path
 
 app = FastAPI(
     title="Connect ML API",
@@ -16,7 +17,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -26,8 +32,9 @@ print("Loading model and data...")
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-df = pd.read_csv("C:/Users/prakh/connect-ml/data/processed/jobs_production.csv")
-embeddings = np.load("C:/Users/prakh/connect-ml/models/job_embeddings_production.npy")
+BASE_DIR = Path(__file__).resolve().parent
+df = pd.read_csv(BASE_DIR / "data" / "processed" / "jobs_production.csv")
+embeddings = np.load(BASE_DIR / "models" / "job_embeddings_production.npy")
 
 print(f"✅ Ready — {len(df)} jobs loaded")
 print(f"   Domains: {df['domain'].value_counts().to_dict()}")
