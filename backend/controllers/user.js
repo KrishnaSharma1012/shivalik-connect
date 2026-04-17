@@ -94,9 +94,13 @@ export const takeAlumniMembership = async (req, res) => {
     }
 
     const alumniId = req.params.id;
-    const alumni = await Alumni.findById(alumniId).select("_id");
+    const alumni = await Alumni.findById(alumniId).select("_id alumniMembershipActive");
     if (!alumni) {
       return res.status(404).json({ message: "Alumni not found" });
+    }
+
+    if (!alumni.alumniMembershipActive) {
+      return res.status(400).json({ message: "This alumni membership is not active yet." });
     }
 
     const student = await Student.findById(req.user._id);
@@ -311,6 +315,11 @@ export const getAlumniWithMembership = async (req, res) => {
 
     const filter = { isSuspended: { $ne: true } };
 
+    // Students should only discover alumni who have activated membership.
+    if (req.user?.role === "student") {
+      filter.alumniMembershipActive = true;
+    }
+
     if (name) {
       const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       filter.name = { $regex: escapedName, $options: "i" };
@@ -330,15 +339,21 @@ export const getAlumniWithMembership = async (req, res) => {
       .lean();
 
     let membershipSet = new Set();
+    let membershipDateMap = new Map();
     if (req.user?.role === "student") {
       const student = await Student.findById(req.user._id).select("takenMemberships").lean();
-      membershipSet = new Set((student?.takenMemberships || []).map((item) => String(item.alumni)));
+      const taken = student?.takenMemberships || [];
+      membershipSet = new Set(taken.map((item) => String(item.alumni)));
+      membershipDateMap = new Map(
+        taken.map((item) => [String(item.alumni), item.takenAt || null])
+      );
     }
 
     const alumni = alumniRows.map((row) => ({
       ...row,
       membershipTaken: membershipSet.has(String(row._id)),
       subscribed: membershipSet.has(String(row._id)),
+      membershipTakenAt: membershipDateMap.get(String(row._id)) || null,
       priceMonth: 199,
     }));
 

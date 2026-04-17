@@ -24,6 +24,7 @@ export default function Academics() {
         
         const mappedCourses = (coursesData.courses || []).map(c => ({
           id: c._id,
+          type: "course",
           title: c.title,
           thumbnail: c.thumbnail,
           instructor: { name: c.instructor?.name || "Instructor", company: c.instructor?.company || "Connect Alumni" },
@@ -31,8 +32,12 @@ export default function Academics() {
           reviews: c.rating?.count || 12,
           modules: 10,
           enrolled: c.enrolledStudents?.length || 0,
-          price: c.price,
-          originalPrice: c.originalPrice || undefined
+          price: c.discountedPrice ?? c.price,
+          basePrice: c.price,
+          originalPrice: (c.discountedPrice && c.discountedPrice < c.price) ? c.price : (c.originalPrice || undefined),
+          discountedPrice: c.discountedPrice,
+          membershipDiscountPercent: c.membershipDiscountPercent || 0,
+          hasMembershipDiscount: Boolean(c.hasMembershipDiscount),
         }));
 
         const mappedSessions = (sessionsData.sessions || []).map(s => ({
@@ -45,7 +50,12 @@ export default function Academics() {
           time: s.time || "6:00 PM IST",
           duration: s.duration || "1 hour",
           enrolled: s.enrolledStudents?.length || 0,
-          price: s.price,
+          price: s.discountedPrice ?? s.price,
+          basePrice: s.price,
+          originalPrice: (s.discountedPrice && s.discountedPrice < s.price) ? s.price : undefined,
+          discountedPrice: s.discountedPrice,
+          membershipDiscountPercent: s.membershipDiscountPercent || 0,
+          hasMembershipDiscount: Boolean(s.hasMembershipDiscount),
           status: s.status || "upcoming"
         }));
 

@@ -2,30 +2,36 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../../components/layout/MainLayout";
 import Loader from "../../../components/common/Loader";
-import PaymentModal from "../../../components/academics/PaymentModal";
 import API from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function AlumniMembershipPage() {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
-  const [openPayment, setOpenPayment] = useState(false);
+  const { user, login } = useAuth();
   const [activating, setActivating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState([]);
+  const [earnings, setEarnings] = useState({});
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
 
   const isActive = Boolean(user?.alumniMembershipActive);
 
-  const fetchConversations = async () => {
+  const fetchMembershipData = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await API.get("/messages/conversations");
-      setConversations(res.data.conversations || []);
+      const [conversationRes, earningsRes] = await Promise.all([
+        API.get("/messages/conversations"),
+        API.get("/earnings/stats"),
+      ]);
+
+      setConversations(conversationRes.data.conversations || []);
+      setEarnings(earningsRes.data || {});
     } catch (err) {
       console.error("Failed to load membership conversations", err);
       setConversations([]);
+      setEarnings({});
       setError(err?.response?.data?.message || "Failed to load membership data.");
     } finally {
       setLoading(false);
@@ -33,7 +39,7 @@ export default function AlumniMembershipPage() {
   };
 
   useEffect(() => {
-    fetchConversations();
+    fetchMembershipData();
   }, []);
 
   const subscriberConversations = useMemo(
@@ -52,6 +58,32 @@ export default function AlumniMembershipPage() {
     return Array.from(map.values());
   }, [subscriberConversations]);
 
+  const monthlyPrice = 199;
+  const netPerSubscriber = Math.round(monthlyPrice * 0.7 * 100) / 100;
+  const grossRevenue = Number(earnings?.totalGross || 0);
+  const platformFee = Number(earnings?.platformFee || 0);
+  const netRevenue = Number(earnings?.netEarnings || 0);
+  const thisMonth = Number(earnings?.thisMonth || 0);
+
+  const renewalDate = useMemo(() => {
+    const base = user?.alumniMembershipStartedAt ? new Date(user.alumniMembershipStartedAt) : new Date();
+    const d = new Date(base);
+    d.setMonth(d.getMonth() + 1);
+    return d;
+  }, [user?.alumniMembershipStartedAt]);
+
+  const renewalDaysLeft = useMemo(() => {
+    const now = new Date();
+    const ms = renewalDate.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+  }, [renewalDate]);
+
+  const startedOn = user?.alumniMembershipStartedAt
+    ? new Date(user.alumniMembershipStartedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "Not activated";
+
+  const renewOn = renewalDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
   const onActivateSuccess = async () => {
     if (activating) return;
     setActivating(true);
@@ -59,9 +91,9 @@ export default function AlumniMembershipPage() {
       const res = await API.post("/users/membership/activate");
       const updated = res?.data?.user;
       if (updated) {
-        await updateUser(updated);
+        login(updated);
       } else {
-        await updateUser({ alumniMembershipActive: true, alumniPlan: "premium" });
+        login({ ...(user || {}), alumniMembershipActive: true, alumniPlan: "premium" });
       }
     } catch (err) {
       console.error("Membership activation failed", err);
@@ -79,7 +111,7 @@ export default function AlumniMembershipPage() {
             Membership Dashboard
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-3)" }}>
-            Offer your membership at ₹199/month. Students with active membership will appear below.
+            Activate your membership once. Students can then purchase your membership at ₹199/month.
           </p>
         </div>
 
@@ -106,7 +138,8 @@ export default function AlumniMembershipPage() {
 
           {!isActive && (
             <button
-              onClick={() => setOpenPayment(true)}
+              onClick={onActivateSuccess}
+              disabled={activating}
               style={{
                 padding: "10px 16px",
                 borderRadius: 11,
@@ -116,12 +149,39 @@ export default function AlumniMembershipPage() {
                 fontSize: 13,
                 fontWeight: 700,
                 fontFamily: "Plus Jakarta Sans",
+                cursor: activating ? "not-allowed" : "pointer",
+                opacity: activating ? 0.75 : 1,
+              }}
+            >
+              {activating ? "Activating..." : "Activate Membership"}
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 4, marginBottom: 14, padding: 4, background: "var(--bg-3)", borderRadius: 12, border: "1px solid var(--border)", width: "fit-content" }}>
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "subscribers", label: "Subscribers" },
+            { id: "revenue", label: "Revenue" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 9,
+                border: "none",
+                background: activeTab === tab.id ? "linear-gradient(135deg,#00E5C3,#0A8FE8)" : "transparent",
+                color: activeTab === tab.id ? "white" : "var(--text-3)",
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: "Plus Jakarta Sans",
                 cursor: "pointer",
               }}
             >
-              Activate at ₹199/mo
+              {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
         <div style={{
@@ -157,7 +217,28 @@ export default function AlumniMembershipPage() {
           </div>
         )}
 
-        {!loading && (
+        {!loading && activeTab === "overview" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 14 }}>
+            <div style={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--bg-3)", padding: "14px 12px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Subscribers</div>
+              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22, color: "var(--text)" }}>{uniqueSubscribers.length}</div>
+            </div>
+            <div style={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--bg-3)", padding: "14px 12px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>This Month</div>
+              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22, color: "var(--text)" }}>₹{thisMonth.toLocaleString("en-IN")}</div>
+            </div>
+            <div style={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--bg-3)", padding: "14px 12px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Started On</div>
+              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>{startedOn}</div>
+            </div>
+            <div style={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--bg-3)", padding: "14px 12px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Next Renewal</div>
+              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>{renewOn} ({renewalDaysLeft}d)</div>
+            </div>
+          </div>
+        )}
+
+        {!loading && activeTab === "subscribers" && (
           <div>
             <h3 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 8 }}>
               Active Subscribers ({uniqueSubscribers.length})
@@ -250,19 +331,33 @@ export default function AlumniMembershipPage() {
             )}
           </div>
         )}
-      </div>
 
-      <PaymentModal
-        isOpen={openPayment}
-        onClose={() => setOpenPayment(false)}
-        course={{
-          title: "Alumni Membership Activation",
-          instructor: user?.name || "You",
-          price: 199,
-        }}
-        skipEnrollment
-        onPaymentSuccess={onActivateSuccess}
-      />
+        {!loading && activeTab === "revenue" && (
+          <div style={{ borderRadius: 14, border: "1px solid var(--border)", background: "var(--bg-3)", padding: "14px" }}>
+            <h3 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 10 }}>
+              Revenue Breakdown
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10 }}>
+              <div style={{ borderRadius: 12, border: "1px solid var(--border)", padding: "12px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Gross Revenue</div>
+                <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>₹{grossRevenue.toLocaleString("en-IN")}</div>
+              </div>
+              <div style={{ borderRadius: 12, border: "1px solid var(--border)", padding: "12px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Platform Fee</div>
+                <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--orange)" }}>₹{platformFee.toLocaleString("en-IN")}</div>
+              </div>
+              <div style={{ borderRadius: 12, border: "1px solid var(--border)", padding: "12px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Net Earnings</div>
+                <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "#00E5C3" }}>₹{netRevenue.toLocaleString("en-IN")}</div>
+              </div>
+              <div style={{ borderRadius: 12, border: "1px solid var(--border)", padding: "12px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Per Subscriber (70%)</div>
+                <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>₹{netPerSubscriber}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </MainLayout>
   );
 }

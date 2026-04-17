@@ -10,14 +10,14 @@ import {
   goLive,
 } from "../controllers/session.js";
 
-import { protect, roleGuard, premiumGuard } from "../middleware/auth.js";
+import { protect, roleGuard, premiumGuard, optionalProtect } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // ─────────────────────────────
 // PUBLIC
 // ─────────────────────────────
-router.get("/", getSessions); // ✅ no need protect
+router.get("/", optionalProtect, getSessions);
 
 // ─────────────────────────────
 // ALUMNI

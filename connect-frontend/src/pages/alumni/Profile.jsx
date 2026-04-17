@@ -12,11 +12,12 @@ import { useAuth } from "../../context/AuthContext";
 function AlumniProfile() {
   const { user, updateUser } = useAuth();
   const [open, setOpen] = useState(false);
+  const [profileUser, setProfileUser] = useState(user || null);
   const [posts, setPosts] = useState([]);
   const [stats, setStats] = useState([
-    { label: "Sessions Taken", value: 0 },
+    { label: "Total Sessions", value: 0 },
     { label: "Students Mentored", value: 0 },
-    { label: "Courses", value: 0 },
+    { label: "Membership", value: "Inactive" },
     { label: "Earnings", value: "₹0" },
   ]);
   const [loading, setLoading] = useState(true);
@@ -26,21 +27,24 @@ function AlumniProfile() {
 
     const fetchData = async () => {
       try {
-        const [postsRes, earningsRes, sessionsRes, coursesRes] = await Promise.all([
+        const [meRes, postsRes, earningsRes, sessionsRes] = await Promise.all([
+          API.get("/auth/me"),
           API.get("/posts/my"),
           API.get("/earnings/stats"),
           API.get("/sessions/my"),
-          API.get("/courses/my"),
         ]);
+
+        const latestUser = meRes?.data?.user || meRes?.data || user;
+        setProfileUser(latestUser);
 
         setPosts(postsRes.data.posts || []);
 
         const statsData = earningsRes.data;
         setStats([
-          { label: "Total Sessions", value: user.stats?.totalSessionsHosted || sessionsRes.data.sessions?.length || 0 },
+          { label: "Total Sessions", value: sessionsRes.data.sessions?.length || 0 },
           { label: "Students Mentored", value: statsData?.totalTransactions || 0 },
-          { label: "Courses", value: coursesRes.data.courses?.length || 0 },
-          { label: "Total Earnings", value: `₹${(user.stats?.totalEarnings || statsData?.totalGross || 0).toLocaleString()}` },
+          { label: "Membership", value: latestUser?.alumniMembershipActive ? "Active" : "Inactive" },
+          { label: "Total Earnings", value: `₹${(statsData?.totalGross || 0).toLocaleString()}` },
         ]);
       } catch (err) {
         console.error("Error fetching profile data:", err);
@@ -54,7 +58,9 @@ function AlumniProfile() {
 
   const handleAvatarChange = async (base64) => {
     try {
-      await updateUser({ avatar: base64 });
+      const res = await updateUser({ avatar: base64 });
+      const updated = res?.user || res;
+      if (updated) setProfileUser(updated);
     } catch (err) {
       console.error("Avatar upload failed:", err);
       alert("Failed to upload avatar. Please try again.");
@@ -63,7 +69,9 @@ function AlumniProfile() {
 
   const handleCoverChange = async (base64) => {
     try {
-      await updateUser({ coverPhoto: base64 });
+      const res = await updateUser({ coverPhoto: base64 });
+      const updated = res?.user || res;
+      if (updated) setProfileUser(updated);
     } catch (err) {
       console.error("Cover photo upload failed:", err);
       alert("Failed to upload cover photo. Please try again.");
@@ -72,7 +80,9 @@ function AlumniProfile() {
 
   const handleSaveProfile = async (updated) => {
     try {
-      await updateUser(updated);
+      const res = await updateUser(updated);
+      const updatedUser = res?.user || res;
+      if (updatedUser) setProfileUser(updatedUser);
       setOpen(false);
     } catch (err) {
       console.error("Profile update failed:", err);
@@ -80,13 +90,13 @@ function AlumniProfile() {
     }
   };
 
-  if (!user) return null;
+  if (!profileUser) return null;
 
   return (
     <MainLayout>
       <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 720, margin: "0 auto", padding: "24px 0" }}>
         <ProfileCard
-          user={user}
+          user={profileUser}
           onEdit={() => setOpen(true)}
           onAvatarChange={handleAvatarChange}
           onCoverChange={handleCoverChange}
@@ -121,7 +131,7 @@ function AlumniProfile() {
           title="Edit Profile"
         >
           <EditProfile
-            user={user}
+            user={profileUser}
             onSave={handleSaveProfile}
           />
         </Modal>

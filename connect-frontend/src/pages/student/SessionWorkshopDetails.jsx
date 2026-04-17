@@ -98,6 +98,9 @@ export default function SessionWorkshopDetails() {
 
   const isWorkshop = session.type === "workshop";
   const liveReady = isItemLive(session);
+  const payablePrice = Number(session?.discountedPrice ?? session?.price ?? 0);
+  const basePrice = Number(session?.basePrice ?? session?.price ?? 0);
+  const hasMembershipDiscount = Boolean(session?.hasMembershipDiscount) && payablePrice < basePrice;
   const seatsLeft = Number(session.seatsLeft ?? 0);
   const totalSeats = Number(session.totalSeats ?? seatsLeft);
   const enrolledCount = Number(session.enrolled ?? Math.max(totalSeats - seatsLeft, 0));
@@ -144,7 +147,8 @@ export default function SessionWorkshopDetails() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
                   <Badge tone={isWorkshop ? "orange" : "purple"}>{isWorkshop ? "Workshop" : "Live Session"}</Badge>
                   {(session.isLive || liveReady) && <Badge tone="teal">LIVE</Badge>}
-                  <Badge tone="teal">₹{Number(session.price).toLocaleString()}</Badge>
+                  <Badge tone="teal">₹{payablePrice.toLocaleString()}</Badge>
+                  {hasMembershipDiscount && <Badge tone="teal">{session?.membershipDiscountPercent || 15}% off via membership</Badge>}
                 </div>
 
                 <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 30, color: "var(--text)", lineHeight: 1.2, marginBottom: 10 }}>
@@ -265,6 +269,7 @@ export default function SessionWorkshopDetails() {
             <h2 style={sectionTitleStyle}>Session Details</h2>
             <div style={{ display: "grid", gap: 10 }}>
               <DetailRow label="Price" value={`₹${Number(session.price).toLocaleString()}`} />
+              {hasMembershipDiscount && <DetailRow label="Original Price" value={`₹${basePrice.toLocaleString()}`} />}
               <DetailRow label="Type" value={isWorkshop ? "Workshop" : "Live Session"} />
               <DetailRow label="Seats Left" value={String(seatsLeft)} />
               <DetailRow label="Total Seats" value={String(totalSeats)} />
@@ -289,7 +294,16 @@ export default function SessionWorkshopDetails() {
           </div>
         )}
 
-        <PaymentModal isOpen={openPayment} onClose={() => setOpenPayment(false)} course={session} />
+        <PaymentModal
+          isOpen={openPayment}
+          onClose={() => setOpenPayment(false)}
+          course={{
+            ...session,
+            id: session?.id || session?._id,
+            price: payablePrice,
+            originalPrice: hasMembershipDiscount ? basePrice : session?.originalPrice,
+          }}
+        />
       </div>
     </MainLayout>
   );

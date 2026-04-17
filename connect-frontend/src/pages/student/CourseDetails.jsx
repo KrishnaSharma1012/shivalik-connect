@@ -7,32 +7,9 @@ import API from "../../utils/api";
 import Loader from "../../components/common/Loader";
 import { isAcademicItemEnrolled } from "../../utils/academicCatalog";
 
-const MODULES = [
-  { num: "01", title: "Foundations & Problem Solving", lessons: 12 },
-  { num: "02", title: "Advanced Data Structures",      lessons: 18 },
-  { num: "03", title: "System Design (HLD + LLD)",     lessons: 14 },
-  { num: "04", title: "Mock Interviews & Feedback",    lessons: 8  },
-];
-
-const OUTCOMES = [
-  "Master Data Structures & Algorithms from scratch",
-  "Crack system design interviews at top companies",
-  "Real interview experiences and insider tips",
-  "Resume review & placement strategy session",
-  "Lifetime access to recordings and materials",
-];
-
-
-
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-
-const StarIcon = ({ filled = true }) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
   </svg>
 );
 
@@ -50,21 +27,6 @@ const ViewProfileIcon = () => (
   </svg>
 );
 
-const getInstructorProfile = instructor => {
-  const name = instructor?.name || "Instructor";
-  const company = instructor?.company || instructor?.title || "Verified Mentor";
-
-  return {
-    _id: instructor?._id,
-    name,
-    role: company,
-    verified: true,
-    college: company,
-    isPremium: true,
-    has24h: false,
-  };
-};
-
 import { useAuth } from "../../context/AuthContext";
 
 export default function CourseDetail() {
@@ -72,35 +34,45 @@ export default function CourseDetail() {
   const navigate    = useNavigate();
   const { user }    = useAuth();
   const [course, setCourse] = useState(state?.course);
-  const enrolled = isAcademicItemEnrolled(course, user);
+
+  const userId = user?._id || user?.id;
+  const isEnrolledFromCourse = Boolean(
+    userId &&
+    Array.isArray(course?.enrolledStudents) &&
+    course.enrolledStudents.some((entry) => {
+      const enrolledStudentId = entry?.student?._id || entry?.student;
+      return String(enrolledStudentId) === String(userId);
+    })
+  );
+
+  const enrolled = isAcademicItemEnrolled(course, user) || isEnrolledFromCourse;
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);
-  const [loading, setLoading] = useState(!course?.syllabus);
+  const [loading, setLoading] = useState(Boolean(course));
 
   React.useEffect(() => {
-    // If we have a course but no syllabus, fetch full details from DB
-    if (course && !course.syllabus) {
-      const fetchDetails = async () => {
-        try {
-          const courseId = course._id || course.id;
-          if (typeof courseId !== "string" || courseId.length < 24) {
-             setLoading(false); return;
-          }
-          const res = await API.get(`/courses/${courseId}`);
-          if (res.data.course) {
-             setCourse(res.data.course);
-          }
-        } catch (err) {
-          console.error("Failed to fetch course details", err);
-        } finally {
-          setLoading(false);
+    const fetchDetails = async () => {
+      const courseId = state?.course?._id || state?.course?.id || course?._id || course?.id;
+      if (typeof courseId !== "string" || courseId.length < 24) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await API.get(`/courses/${courseId}`);
+        if (res.data.course) {
+          setCourse(res.data.course);
         }
-      };
-      fetchDetails();
-    } else {
-      setLoading(false);
-    }
-  }, [course?._id || course?.id]);
+      } catch (err) {
+        console.error("Failed to fetch course details", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [state?.course?._id, state?.course?.id]);
 
   if (!course) {
     return (
@@ -126,6 +98,18 @@ export default function CourseDetail() {
       </MainLayout>
     );
   }
+
+  const syllabusRows = Array.isArray(course?.syllabus) ? course.syllabus : [];
+  const assignments = Array.isArray(course?.assignments) ? course.assignments : [];
+  const outcomeRows = Array.isArray(course?.outcomes)
+    ? course.outcomes.filter(Boolean)
+    : syllabusRows.map((row) => row?.topic).filter(Boolean);
+  const instructorName = course?.instructor?.name || "Instructor";
+  const instructorBio = course?.instructor?.about || "No instructor bio added yet.";
+  const totalStudents = course?.studentsCount || course?.enrolledStudents?.length || 0;
+  const payablePrice = Number(course?.discountedPrice ?? course?.price ?? 0);
+  const basePrice = Number(course?.price ?? 0);
+  const hasMembershipDiscount = Boolean(course?.hasMembershipDiscount) && payablePrice < basePrice;
 
   return (
     <MainLayout>
@@ -182,7 +166,7 @@ export default function CourseDetail() {
               <div style={{ flex: 1 }}>
                 <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{course?.instructor?.name || course?.instructor || "Verified Mentor"}</p>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {course?.students && <span style={{ fontSize: 12, color: "var(--text-3)" }}>{course?.studentsCount || course?.students || 0} students</span>}
+                  <span style={{ fontSize: 12, color: "var(--text-3)" }}>{totalStudents} students</span>
                 </div>
               </div>
               <button
@@ -215,7 +199,15 @@ export default function CourseDetail() {
             {/* Price & CTA */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 30, color: "var(--text)" }}>₹{(course?.price || 0).toLocaleString()}</span>
+                <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 30, color: "var(--text)" }}>₹{payablePrice.toLocaleString()}</span>
+                {hasMembershipDiscount && (
+                  <span style={{ fontSize: 14, color: "var(--text-3)", textDecoration: "line-through" }}>₹{basePrice.toLocaleString()}</span>
+                )}
+                {hasMembershipDiscount && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--teal)", background: "rgba(0,229,195,0.12)", border: "1px solid rgba(0,229,195,0.3)", borderRadius: 999, padding: "4px 10px" }}>
+                    {course?.membershipDiscountPercent || 15}% membership off
+                  </span>
+                )}
               </div>
               <button onClick={() => enrolled ? null : setOpen(true)} style={{
                 padding: "13px 28px",
@@ -239,14 +231,18 @@ export default function CourseDetail() {
         {/* What you'll learn */}
         <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", marginBottom: 16 }}>
           <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 16 }}>What you'll learn</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {OUTCOMES.map((o, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span style={{ color: "var(--teal)", flexShrink: 0, marginTop: 2 }}><CheckIcon /></span>
-                <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>{o}</p>
-              </div>
-            ))}
-          </div>
+          {outcomeRows.length === 0 ? (
+            <p style={{ fontSize: 14, color: "var(--text-3)" }}>No learning outcomes were added during course creation.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {outcomeRows.map((o, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{ color: "var(--teal)", flexShrink: 0, marginTop: 2 }}><CheckIcon /></span>
+                  <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>{o}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Course content */}
@@ -254,38 +250,44 @@ export default function CourseDetail() {
           <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border)" }}>
             <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>Course Content</h2>
             <p style={{ fontSize: 13, color: "var(--text-3)", marginTop: 4 }}>
-              {course.syllabus?.length || MODULES.reduce((a, m) => a + m.lessons, 0)} {course.syllabus ? "modules" : "lessons"} · Lifetime access
+              {syllabusRows.length} modules · Lifetime access
             </p>
           </div>
-          {(course.syllabus?.length > 0 ? course.syllabus : MODULES).map((mod, i) => (
-            <div key={i}
-              onClick={() => setExpanded(expanded === i ? null : i)}
-              style={{
-                padding: "14px 24px", borderBottom: i < ((course.syllabus?.length || MODULES.length) - 1) ? "1px solid var(--border)" : "none",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                cursor: "pointer", transition: "background 0.15s",
-                background: expanded === i ? "rgba(124,92,252,0.05)" : "transparent",
-              }}
-              onMouseEnter={e => { if (expanded !== i) e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
-              onMouseLeave={e => { if (expanded !== i) e.currentTarget.style.background = "transparent"; }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 13, color: "var(--purple-light)", width: 24 }}>{String(i + 1).padStart(2, "0")}</span>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{mod.topic || mod.title}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "var(--text-3)" }}>{mod.video ? mod.video.duration : (mod.lessons ? `${mod.lessons} lessons` : "Live")}</span>
-                <span style={{ fontSize: 14, color: "var(--text-3)", transform: expanded === i ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>›</span>
-              </div>
+          {syllabusRows.length === 0 ? (
+            <div style={{ padding: "16px 24px", fontSize: 14, color: "var(--text-3)" }}>
+              No syllabus was added during course creation.
             </div>
-          ))}
+          ) : (
+            syllabusRows.map((mod, i) => (
+              <div key={i}
+                onClick={() => setExpanded(expanded === i ? null : i)}
+                style={{
+                  padding: "14px 24px", borderBottom: i < (syllabusRows.length - 1) ? "1px solid var(--border)" : "none",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  cursor: "pointer", transition: "background 0.15s",
+                  background: expanded === i ? "rgba(124,92,252,0.05)" : "transparent",
+                }}
+                onMouseEnter={e => { if (expanded !== i) e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
+                onMouseLeave={e => { if (expanded !== i) e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 13, color: "var(--purple-light)", width: 24 }}>{String(i + 1).padStart(2, "0")}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{mod.topic || mod.title || "Untitled module"}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-3)" }}>{mod.video?.duration || mod.duration || ""}</span>
+                  <span style={{ fontSize: 14, color: "var(--text-3)", transform: expanded === i ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>›</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
-        {enrolled && course.syllabus?.some(row => row.video) && (
+        {enrolled && syllabusRows.some(row => row.video) && (
           <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", marginBottom: 16 }}>
             <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 16 }}>Topic Videos</h2>
             <div style={{ display: "grid", gap: 12 }}>
-              {course.syllabus.filter(row => row.video).map((row, index) => (
+              {syllabusRows.filter(row => row.video).map((row, index) => (
                 <div key={`${row.week}-${index}`} style={{ padding: 14, borderRadius: 14, background: "var(--bg-4)", border: "1px solid var(--border)" }}>
                   <p style={{ fontSize: 12, color: "var(--purple-light)", fontWeight: 700, marginBottom: 4 }}>{row.week}</p>
                   <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 10 }}>{row.topic}</p>
@@ -308,11 +310,11 @@ export default function CourseDetail() {
           </div>
         )}
 
-        {enrolled && course.assignments?.length > 0 && (
+        {enrolled && assignments.length > 0 && (
           <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", marginBottom: 16 }}>
             <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 16 }}>Course Assignments</h2>
             <div style={{ display: "grid", gap: 12 }}>
-              {course.assignments.map((asm, idx) => (
+              {assignments.map((asm, idx) => (
                 <div key={idx} style={{ 
                   padding: 16, borderRadius: 16, background: "var(--bg-4)", border: "1px solid var(--border)",
                   display: "flex", justifyContent: "space-between", alignItems: "center"
@@ -335,7 +337,7 @@ export default function CourseDetail() {
           </div>
         )}
 
-        {!enrolled && course.syllabus?.some(row => row.video) && (
+        {!enrolled && syllabusRows.some(row => row.video) && (
           <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", marginBottom: 16 }}>
             <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 10 }}>Topic Videos</h2>
             <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.7 }}>
@@ -353,9 +355,9 @@ export default function CourseDetail() {
               background: "linear-gradient(135deg, #7C5CFC, #FF7043)",
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "white", fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22,
-            }}>{(course.instructor || "I")[0]}</div>
+            }}>{instructorName[0]}</div>
             <div>
-              <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>{course.instructor?.name || course.instructor}</p>
+              <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>{instructorName}</p>
               <button
                 onClick={() => navigate("/alumni-profile", { state: { alumniId: course.instructor?._id || course.instructor } })}
                 style={{
@@ -382,7 +384,7 @@ export default function CourseDetail() {
                 View Profile
               </button>
               <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.7 }}>
-                Experienced engineer helping students break into top tech companies. Passionate about structured mentorship, real-world problem solving, and helping the next generation of engineers succeed.
+                {instructorBio}
               </p>
             </div>
           </div>
@@ -390,7 +392,17 @@ export default function CourseDetail() {
 
       </div>
 
-      <PaymentModal isOpen={open} onClose={() => setOpen(false)} course={course} />
+      <PaymentModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        course={{
+          ...course,
+          id: course?.id || course?._id,
+          type: "course",
+          price: payablePrice,
+          originalPrice: hasMembershipDiscount ? basePrice : course?.originalPrice,
+        }}
+      />
     </MainLayout>
   );
 }

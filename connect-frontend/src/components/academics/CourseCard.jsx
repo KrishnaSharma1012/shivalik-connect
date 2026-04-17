@@ -15,6 +15,8 @@ export function CourseCard({ course }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const enrolled = isAcademicItemEnrolled(course, user);
+  const hasMembershipDiscount = Boolean(course?.hasMembershipDiscount) && Number(course?.price) < Number(course?.basePrice || course?.originalPrice || course?.price);
+  const comparePrice = Number(course?.basePrice || course?.originalPrice || course?.price || 0);
   const instructorLabel = typeof course.instructor === "string"
     ? course.instructor
     : course.instructor?.name || "Instructor";
@@ -105,6 +107,14 @@ export function CourseCard({ course }) {
             <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>
               {enrolled ? "Free Access" : `₹${course.price.toLocaleString()}`}
             </span>
+            {!enrolled && hasMembershipDiscount && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                <span style={{ fontSize: 12, color: "var(--text-3)", textDecoration: "line-through" }}>₹{comparePrice.toLocaleString()}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)" }}>
+                  {course?.membershipDiscountPercent || 15}% off
+                </span>
+              </div>
+            )}
           </div>
           <button
             onClick={e => { e.stopPropagation(); navigate("/course-detail", { state: { course } }); }}
@@ -131,6 +141,8 @@ export function SessionCard({ session }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const enrolled = isAcademicItemEnrolled(session, user);
+  const hasMembershipDiscount = Boolean(session?.hasMembershipDiscount) && Number(session?.price) < Number(session?.basePrice || session?.price || 0);
+  const comparePrice = Number(session?.basePrice || session?.price || 0);
   const isFull = session.seatsLeft === 0;
   const instructorLabel = typeof session.instructor === "string"
     ? session.instructor
@@ -210,9 +222,19 @@ export function SessionCard({ session }) {
 
         {/* Price & CTA */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>
-             {enrolled ? "Paid" : `₹${session.price.toLocaleString()}`}
-          </span>
+          <div>
+            <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: "var(--text)" }}>
+              {enrolled ? "Paid" : `₹${session.price.toLocaleString()}`}
+            </span>
+            {!enrolled && hasMembershipDiscount && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                <span style={{ fontSize: 12, color: "var(--text-3)", textDecoration: "line-through" }}>₹{comparePrice.toLocaleString()}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)" }}>
+                  {session?.membershipDiscountPercent || 15}% off
+                </span>
+              </div>
+            )}
+          </div>
           <button
             onClick={e => {
               e.stopPropagation();

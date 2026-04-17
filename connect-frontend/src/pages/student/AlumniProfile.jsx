@@ -40,6 +40,17 @@ const formatArray = (value) => {
   return value.filter(Boolean);
 };
 
+const hasDisplayValue = (value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "number") return value !== 0;
+
+  const text = String(value).trim();
+  if (!text) return false;
+
+  const normalized = text.toLowerCase();
+  return !["0", "null", "undefined", "na", "n/a", "-", "—"].includes(normalized);
+};
+
 
 
 export default function StudentAlumniProfile() {
@@ -66,7 +77,7 @@ export default function StudentAlumniProfile() {
     }
   }, [alumni]);
 
-  const allowsMembership = Boolean(alumni?.membershipEnabled || alumni?.isPremium || alumni?.priceMonth);
+  const allowsMembership = Boolean(alumni?.alumniMembershipActive || alumni?.membershipEnabled || alumni?.priceMonth === 199);
 
   useEffect(() => {
     if (!alumniId) return;
@@ -75,13 +86,13 @@ export default function StudentAlumniProfile() {
       setLoading(true);
       try {
         const [userRes, postsRes, coursesRes, sessionsRes] = await Promise.all([
-          !alumni ? API.get(`/users/${alumniId}`) : Promise.resolve({ data: { user: alumni } }),
+          API.get(`/users/${alumniId}`),
           posts.length === 0 ? API.get(`/posts/user/${alumniId}`) : Promise.resolve({ data: { posts } }),
           API.get("/courses"),
           API.get("/sessions")
         ]);
 
-        if (!alumni) setAlumni(userRes.data.user);
+        setAlumni(userRes.data.user || null);
         if (posts.length === 0) setPosts(postsRes.data.posts || []);
 
         const matchedCourses = (coursesRes.data.courses || []).filter(c => c.instructor?._id === alumniId).map(c => ({
@@ -153,7 +164,11 @@ export default function StudentAlumniProfile() {
     "Google": "#4285F4", "Amazon": "#FF9900", "Microsoft": "#00A4EF",
     "Meta": "#1877F2", "Netflix": "#E50914", "Flipkart": "#2874F0",
   };
-  const companyName = alumni?.role?.split("@ ")[1] || "";
+  const companyName =
+    (hasDisplayValue(alumni?.company) && String(alumni.company).trim()) ||
+    (typeof alumni?.role === "string" && alumni.role.includes("@")
+      ? alumni.role.split("@").pop().trim()
+      : "");
   const accentColor = companies[companyName] || "var(--purple)";
 
   useEffect(() => {
@@ -194,7 +209,37 @@ export default function StudentAlumniProfile() {
     );
   }
 
-  const initial = (alumni.name || "A")[0].toUpperCase();
+  const derivedNameFromEmail = hasDisplayValue(alumni.email)
+    ? String(alumni.email)
+        .split("@")[0]
+        .replace(/[._-]+/g, " ")
+        .trim()
+    : "";
+  const titleCaseName = hasDisplayValue(derivedNameFromEmail)
+    ? derivedNameFromEmail.replace(/\b\w/g, (char) => char.toUpperCase())
+    : "";
+  const roleParts = hasDisplayValue(alumni.role) ? String(alumni.role).split("@") : [];
+  const displayName = hasDisplayValue(alumni.name)
+    ? alumni.name
+    : hasDisplayValue(alumni.fullName)
+      ? alumni.fullName
+      : hasDisplayValue(titleCaseName)
+        ? titleCaseName
+        : "Alumni Mentor";
+  const displayRole = hasDisplayValue(alumni.title)
+    ? alumni.title
+    : hasDisplayValue(roleParts[0])
+      ? String(roleParts[0]).trim()
+      : "Alumni Mentor";
+  const displayCompany = hasDisplayValue(alumni.company)
+    ? alumni.company
+    : hasDisplayValue(roleParts[1])
+      ? String(roleParts[1]).trim()
+      : "";
+  const displayCollege = hasDisplayValue(alumni.college) ? alumni.college : "";
+  const displayLocation = [alumni.city, alumni.country].filter((item) => hasDisplayValue(item)).join(", ");
+
+  const initial = displayName[0].toUpperCase();
   const sessionsCount = items.filter(item => item.type === "session" || item.type === "workshop").length;
   const coursesCount = items.filter(item => item.type === "course").length;
   const studentsCount = items.reduce((sum, item) => sum + (item.enrolledStudents?.length || item.enrolled || 0), 0);
@@ -213,26 +258,40 @@ export default function StudentAlumniProfile() {
   const detailRows = [
     { label: "Title", value: alumni.title },
     { label: "Headline", value: alumni.headline },
-    { label: "Company", value: alumni.company },
-    { label: "College", value: alumni.college },
+    { label: "Company", value: displayCompany },
     { label: "Domain", value: alumni.domain },
     { label: "City", value: alumni.city },
     { label: "Country", value: alumni.country },
-    { label: "Joining Year", value: alumni.joiningYear },
-    { label: "Passing Year", value: alumni.passingYear },
+  ];
+
+  const educationRows = [
+    { label: "College", value: alumni.college },
     { label: "Degree", value: alumni.degree },
     { label: "Branch", value: alumni.branch },
-    { label: "Plan", value: alumni.alumniPlan },
-    { label: "24h Reply", value: alumni.has24hReply ? "Enabled" : "Disabled" },
-    { label: "College Partner", value: alumni.isCollegePartner ? "Yes" : "No" },
-  ];
+    { label: "Joining Year", value: alumni.joiningYear },
+    { label: "Passing Year", value: alumni.passingYear },
+  ].filter((row) => hasDisplayValue(row.value));
 
   const statCards = [
     { label: "Average Rating", value: alumni.avgRating ?? 0, sub: `${reviews.length} reviews`, color: "#F5C842" },
     { label: "Review Count", value: alumni.reviewCount ?? reviews.length, sub: "student feedback", color: "var(--purple-light)" },
     { label: "Connections", value: alumni.connectionsCount ?? (Array.isArray(alumni.connections) ? alumni.connections.length : 0), sub: "network size", color: "#00E5C3" },
     { label: "Sessions Hosted", value: alumniStats.totalSessionsHosted ?? sessionsCount, sub: "live sessions", color: "var(--orange)" },
-  ];
+  ].filter((stat) => hasDisplayValue(stat.value));
+
+  const primaryStats = [
+    { label: "Sessions", value: sessionsCount, color: "var(--purple-light)" },
+    { label: "Students", value: studentsCount, color: "var(--teal)" },
+    { label: "Courses", value: coursesCount, color: "var(--orange)" },
+    { label: "Posts", value: posts.length, color: "#F5C842" },
+  ].filter((stat) => hasDisplayValue(stat.value));
+
+  const hasEducationData = educationRows.length > 0;
+  const filteredDetailRows = detailRows.filter((row) => hasDisplayValue(row.value));
+  const professionalRows = filteredDetailRows.filter((row) => ["Title", "Headline", "Company", "Domain"].includes(row.label));
+  const locationRows = filteredDetailRows.filter((row) => ["City", "Country"].includes(row.label));
+  const joiningYear = hasDisplayValue(alumni.joiningYear) ? alumni.joiningYear : null;
+  const passingYear = hasDisplayValue(alumni.passingYear) ? alumni.passingYear : null;
 
   return (
     <MainLayout>
@@ -258,189 +317,248 @@ export default function StudentAlumniProfile() {
         }}>
           {/* Cover */}
           <div style={{
-            height: 120,
-            background: `linear-gradient(135deg, ${accentColor}18 0%, rgba(124,92,252,0.12) 50%, rgba(0,229,195,0.08) 100%)`,
+            height: 180,
+            background: alumni.coverPhoto
+              ? `url(${alumni.coverPhoto}) center/cover no-repeat`
+              : `linear-gradient(135deg, ${accentColor}18 0%, rgba(124,92,252,0.12) 50%, rgba(0,229,195,0.08) 100%)`,
             position: "relative",
           }}>
-            <div style={{
-              position: "absolute", top: "40%", left: "50%", transform: "translateX(-50%)",
-              width: 280, height: 60,
-              background: `radial-gradient(ellipse, ${accentColor}22 0%, transparent 70%)`,
-              filter: "blur(20px)",
-            }} />
+            {!alumni.coverPhoto && (
+              <div style={{
+                position: "absolute", top: "40%", left: "50%", transform: "translateX(-50%)",
+                width: 280, height: 60,
+                background: `radial-gradient(ellipse, ${accentColor}22 0%, transparent 70%)`,
+                filter: "blur(20px)",
+              }} />
+            )}
           </div>
 
-          <div style={{ padding: "0 28px 28px" }}>
-            {/* Avatar + actions row */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: -44, marginBottom: 20 }}>
-              {/* Avatar */}
+          <div style={{ padding: "22px 28px 28px" }}>
+            {/* Profile identity */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "88px minmax(0, 1fr)",
+              gap: 14,
+              marginBottom: 16,
+              alignItems: "start",
+            }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div style={{
                   width: 88, height: 88, borderRadius: 22,
-                  background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)`,
-                  border: `3px solid var(--bg-3)`,
+                  background: alumni.avatar
+                    ? `url(${alumni.avatar}) center/cover no-repeat`
+                    : `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)`,
+                  border: `2px solid rgba(255,255,255,0.16)`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: accentColor, fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 34,
                   boxShadow: `0 6px 24px ${accentColor}30`,
                 }}>
-                  {initial}
+                  {!alumni.avatar && initial}
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div style={{ display: "flex", gap: 10 }}>
-                {allowsMembership && (
-                  <button
-                    onClick={() => {
-                      if (membershipTaken) return;
-                      setShowMembershipPayment(true);
-                    }}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                  <h1 style={{
+                    fontFamily: "Plus Jakarta Sans",
+                    fontWeight: 900,
+                    fontSize: 30,
+                    lineHeight: 1.12,
+                    color: "#F8FAFF",
+                    margin: 0,
+                    letterSpacing: "-0.02em",
+                  }}>
+                    {displayName}
+                  </h1>
+                  {isConnectVerifiedAlumni && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span className="badge-verified">Connect Verified</span>
+                      <button
+                        type="button"
+                        title="College tie ups results in verification"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          border: "1px solid rgba(0,229,195,0.35)",
+                          background: "rgba(0,229,195,0.1)",
+                          color: "var(--teal)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          cursor: "help",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: 0,
+                        }}
+                      >
+                        i
+                      </button>
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span
                     style={{
-                      padding: "10px 16px",
-                      borderRadius: 11,
-                      border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "none",
-                      background: membershipTaken ? "rgba(16,185,129,0.12)" : "linear-gradient(135deg, #F5C842, #FFB830)",
-                      color: membershipTaken ? "#10B981" : "#1A1A1A",
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: 700,
-                      fontFamily: "Plus Jakarta Sans",
-                      cursor: membershipTaken ? "default" : "pointer",
-                      transition: "all 0.2s",
+                      color: "var(--text-2)",
+                      background: "rgba(124,92,252,0.12)",
+                      border: "1px solid rgba(124,92,252,0.24)",
+                      borderRadius: 999,
+                      padding: "5px 10px",
                     }}
                   >
-                    {membershipTaken ? "Membership Active" : "Take Membership"}
-                  </button>
-                )}
-                {connectStatus === "connected" && (
-                  <button onClick={() => navigate(`/messages?user=${alumniId}`)} style={{
-                    display: "flex", alignItems: "center", gap: 7,
-                    padding: "10px 18px", borderRadius: 11,
-                    background: "rgba(0,229,195,0.1)", border: "1px solid rgba(0,229,195,0.3)",
-                    color: "var(--teal)", fontSize: 13, fontWeight: 700,
-                    fontFamily: "Plus Jakarta Sans", cursor: "pointer", transition: "all 0.2s",
-                  }}>
-                    <MessageIcon /> Message
-                  </button>
-                )}
+                    {displayRole}
+                  </span>
+                  {hasDisplayValue(displayCompany) && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#F3D68A",
+                        background: "rgba(245,200,66,0.1)",
+                        border: "1px solid rgba(245,200,66,0.2)",
+                        borderRadius: 999,
+                        padding: "5px 10px",
+                      }}
+                    >
+                      {displayCompany}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                  {hasDisplayValue(displayCollege) && <span style={{ fontSize: 13, color: "var(--text-3)" }}>🎓 {displayCollege}</span>}
+                  {hasDisplayValue(displayLocation) && <span style={{ fontSize: 13, color: "var(--text-3)" }}>📍 {displayLocation}</span>}
+                  {allowsMembership && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: membershipTaken ? "#10B981" : "#F5C842", background: membershipTaken ? "rgba(16,185,129,0.12)" : "rgba(245,200,66,0.12)", border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(245,200,66,0.3)", borderRadius: 99, padding: "4px 10px" }}>
+                      {membershipTaken ? "Membership subscribed" : "Membership available"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action row */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+              {allowsMembership && (
                 <button
-                  onClick={handleConnect}
-                  disabled={connecting}
+                  onClick={() => {
+                    if (membershipTaken) return;
+                    setShowMembershipPayment(true);
+                  }}
                   style={{
-                    padding: "10px 22px", borderRadius: 11, border: "none",
-                    fontSize: 13, fontWeight: 700, fontFamily: "Plus Jakarta Sans", cursor: "pointer",
+                    padding: "10px 16px",
+                    borderRadius: 11,
+                    border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "none",
+                    background: membershipTaken ? "rgba(16,185,129,0.12)" : "linear-gradient(135deg, #F5C842, #FFB830)",
+                    color: membershipTaken ? "#10B981" : "#1A1A1A",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: "Plus Jakarta Sans",
+                    cursor: membershipTaken ? "default" : "pointer",
                     transition: "all 0.2s",
-                    background: connectStatus === "connect" ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)"
-                      : connectStatus === "pending" ? "var(--bg-4)"
-                      : "rgba(0,229,195,0.1)",
-                    color: connectStatus === "connect" ? "white"
-                      : connectStatus === "pending" ? "var(--text-3)"
-                      : "var(--teal)",
-                    border: connectStatus !== "connect" ? "1px solid var(--border)" : "none",
-                    boxShadow: connectStatus === "connect" ? "0 4px 18px rgba(124,92,252,0.35)" : "none",
                   }}
                 >
-                  {connectStatus === "connect" ? "Connect" : connectStatus === "pending" ? "Pending…" : "✓ Connected"}
+                  {membershipTaken ? "Membership Active" : "Take Membership"}
                 </button>
-              </div>
-            </div>
-
-            {/* Name + badges */}
-            <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 24, color: "var(--text)" }}>
-                {alumni.name}
-              </h1>
-              {isConnectVerifiedAlumni && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span className="badge-verified">Connect Verified</span>
-                  <button
-                    type="button"
-                    title="College tie ups results in verification"
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      border: "1px solid rgba(0,229,195,0.35)",
-                      background: "rgba(0,229,195,0.1)",
-                      color: "var(--teal)",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      cursor: "help",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 0,
-                    }}
-                  >
-                    i
-                  </button>
-                </span>
               )}
-            </div>
-
-            <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 6 }}>{alumni.role}</p>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 13, color: "var(--text-3)" }}>🎓 {alumni.college}</span>
-              {allowsMembership && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: membershipTaken ? "#10B981" : "#F5C842", background: membershipTaken ? "rgba(16,185,129,0.12)" : "rgba(245,200,66,0.12)", border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(245,200,66,0.3)", borderRadius: 99, padding: "4px 10px" }}>
-                  {membershipTaken ? "Membership subscribed" : "Membership available"}
-                </span>
+              {connectStatus === "connected" && (
+                <button onClick={() => navigate(`/messages?user=${alumniId}`)} style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  padding: "10px 18px", borderRadius: 11,
+                  background: "rgba(0,229,195,0.1)", border: "1px solid rgba(0,229,195,0.3)",
+                  color: "var(--teal)", fontSize: 13, fontWeight: 700,
+                  fontFamily: "Plus Jakarta Sans", cursor: "pointer", transition: "all 0.2s",
+                }}>
+                  <MessageIcon /> Message
+                </button>
               )}
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                style={{
+                  padding: "10px 22px", borderRadius: 11, border: "none",
+                  fontSize: 13, fontWeight: 700, fontFamily: "Plus Jakarta Sans", cursor: "pointer",
+                  transition: "all 0.2s",
+                  background: connectStatus === "connect" ? "linear-gradient(135deg, #7C5CFC, #9B7EFF)"
+                    : connectStatus === "pending" ? "var(--bg-4)"
+                    : "rgba(0,229,195,0.1)",
+                  color: connectStatus === "connect" ? "white"
+                    : connectStatus === "pending" ? "var(--text-3)"
+                    : "var(--teal)",
+                  border: connectStatus !== "connect" ? "1px solid var(--border)" : "none",
+                  boxShadow: connectStatus === "connect" ? "0 4px 18px rgba(124,92,252,0.35)" : "none",
+                }}
+              >
+                {connectStatus === "connect" ? "Connect" : connectStatus === "pending" ? "Pending…" : "✓ Connected"}
+              </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 18 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
               {[
-                { label: "Email", value: alumni.email },
-                { label: "Role", value: alumni.role },
-                { label: "Verified", value: isConnectVerifiedAlumni ? "Connect Verified" : "No" },
-                { label: "Premium", value: alumni.alumniPlan === "premium" ? "Premium" : "Simple" },
-              ].map((item) => (
-                <div key={item.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{formatValue(item.value)}</div>
-                </div>
+                { icon: "✉️", label: "Email", value: alumni.email },
+                { icon: "🏢", label: "Company", value: displayCompany },
+                { icon: "🧭", value: alumni.domain },
+                { icon: "📍", value: alumni.city },
+              ].filter((item) => hasDisplayValue(item.value)).map((item, idx) => (
+                <span
+                  key={`${item.icon}-${item.value}-${idx}`}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: "1px solid var(--border)",
+                    background: "rgba(255,255,255,0.02)",
+                    color: "var(--text-2)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {item.icon} {item.label ? `${item.label}: ` : ""}{item.value}
+                </span>
               ))}
             </div>
           </div>
         </div>
 
         {/* Stats bar */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20,
-        }}>
-          {[
-            { label: "Sessions", value: String(sessionsCount), color: "var(--purple-light)" },
-            { label: "Students", value: String(studentsCount), color: "var(--teal)" },
-            { label: "Courses", value: String(coursesCount), color: "var(--orange)" },
-            { label: "Posts", value: String(posts.length), color: "#F5C842" },
-          ].map((s, i) => (
+        {primaryStats.length > 0 && (
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 20,
+          }}>
+            {primaryStats.map((s, i) => (
             <div key={i} style={{
               background: "var(--bg-3)", border: "1px solid var(--border)",
               borderRadius: 14, padding: "16px 12px", textAlign: "center",
             }}>
               <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 20, color: s.color, marginBottom: 4 }}>
-                {s.value}
+                {String(s.value)}
               </p>
               <p style={{ fontSize: 11, color: "var(--text-3)" }}>{s.label}</p>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: 12,
-          marginBottom: 20,
-        }}>
-          {statCards.map((stat) => (
-            <div key={stat.label} style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 14px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>{stat.label}</div>
-              <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22, color: stat.color, marginBottom: 4 }}>{stat.value}</div>
-              <div style={{ fontSize: 11, color: "var(--text-3)" }}>{stat.sub}</div>
-            </div>
-          ))}
-        </div>
+        {statCards.length > 0 && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12,
+            marginBottom: 20,
+          }}>
+            {statCards.map((stat) => (
+              <div key={stat.label} style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 14px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>{stat.label}</div>
+                <div style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 22, color: stat.color, marginBottom: 4 }}>{stat.value}</div>
+                <div style={{ fontSize: 11, color: "var(--text-3)" }}>{stat.sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
@@ -474,20 +592,164 @@ export default function StudentAlumniProfile() {
               background: "var(--bg-3)", border: "1px solid var(--border)",
               borderRadius: 16, padding: "20px 22px",
             }}>
-              <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Profile Details</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                {detailRows.filter(row => row.value && row.value !== "—" && row.value !== "").map((row) => (
-                  <div key={row.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 5 }}>
-                      <InfoIcon />
-                      {row.label}
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Education</h3>
+              {hasEducationData === false ? (
+                <p style={{ fontSize: 13, color: "var(--text-3)" }}>Education details are not available.</p>
+              ) : (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(250px, 1.2fr) minmax(200px, 0.8fr)",
+                  gap: 12,
+                }}>
+                  <div style={{
+                    borderRadius: 14,
+                    padding: "16px",
+                    border: "1px solid rgba(124,92,252,0.3)",
+                    background: "linear-gradient(135deg, rgba(124,92,252,0.16), rgba(124,92,252,0.05) 55%, rgba(0,229,195,0.04))",
+                  }}>
+                    <div style={{ fontSize: 11, color: "#C8BCFF", marginBottom: 8, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                      Academic Foundation
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.5 }}>
-                      {row.value}
+                    {hasDisplayValue(alumni.college) && (
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", lineHeight: 1.35, marginBottom: 10 }}>
+                        {alumni.college}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {hasDisplayValue(alumni.degree) && (
+                        <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", fontSize: 12, color: "var(--text-2)", fontWeight: 700 }}>
+                          {alumni.degree}
+                        </span>
+                      )}
+                      {hasDisplayValue(alumni.branch) && (
+                        <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", fontSize: 12, color: "var(--text-2)", fontWeight: 700 }}>
+                          {alumni.branch}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div style={{
+                    borderRadius: 14,
+                    padding: "16px",
+                    border: "1px solid var(--border)",
+                    background: "rgba(255,255,255,0.02)",
+                  }}>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 10, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                      Timeline
+                    </div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {joiningYear !== null && (
+                        <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                            <InfoIcon />
+                            Joining Year
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{joiningYear}</div>
+                        </div>
+                      )}
+                      {passingYear !== null && (
+                        <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                            <InfoIcon />
+                            Passing Year
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{passingYear}</div>
+                        </div>
+                      )}
+                      {joiningYear !== null && passingYear !== null && Number(passingYear) >= Number(joiningYear) && (
+                        <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                          Program Duration: <span style={{ color: "var(--text-2)", fontWeight: 700 }}>{Number(passingYear) - Number(joiningYear)} years</span>
+                        </div>
+                      )}
+                      {joiningYear === null && passingYear === null && (
+                        <div style={{ fontSize: 13, color: "var(--text-3)" }}>Academic year timeline is not available.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: "var(--bg-3)", border: "1px solid var(--border)",
+              borderRadius: 16, padding: "20px 22px",
+            }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Profile Details</h3>
+              {filteredDetailRows.length === 0 ? (
+                <p style={{ fontSize: 13, color: "var(--text-3)" }}>Profile details are not available.</p>
+              ) : (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(250px, 1.2fr) minmax(200px, 0.8fr)",
+                  gap: 12,
+                }}>
+                  <div style={{
+                    borderRadius: 14,
+                    padding: "16px",
+                    border: "1px solid rgba(0,229,195,0.28)",
+                    background: "linear-gradient(145deg, rgba(0,229,195,0.13), rgba(0,229,195,0.04) 55%, rgba(124,92,252,0.05))",
+                  }}>
+                    <div style={{ fontSize: 11, color: "#9CEFE3", marginBottom: 10, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                      Professional Snapshot
+                    </div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {professionalRows.map((row) => (
+                        <div key={row.label} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.12)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                            <InfoIcon />
+                            {row.label}
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#F3FFFC", lineHeight: 1.45 }}>
+                            {row.value}
+                          </div>
+                        </div>
+                      ))}
+                      {professionalRows.length === 0 && (
+                        <div style={{ fontSize: 13, color: "var(--text-3)" }}>Professional details are not available.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    borderRadius: 14,
+                    padding: "16px",
+                    border: "1px solid var(--border)",
+                    background: "rgba(255,255,255,0.02)",
+                  }}>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 10, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                      Location and Contact
+                    </div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {locationRows.map((row) => (
+                        <div key={row.label} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                            <InfoIcon />
+                            {row.label}
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>
+                            {row.value}
+                          </div>
+                        </div>
+                      ))}
+                      {hasDisplayValue(alumni.email) && (
+                        <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                            <InfoIcon />
+                            Email
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)", wordBreak: "break-word" }}>
+                            {alumni.email}
+                          </div>
+                        </div>
+                      )}
+                      {locationRows.length === 0 && !hasDisplayValue(alumni.email) && (
+                        <div style={{ fontSize: 13, color: "var(--text-3)" }}>Location and contact details are not available.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {availability.length > 0 && (

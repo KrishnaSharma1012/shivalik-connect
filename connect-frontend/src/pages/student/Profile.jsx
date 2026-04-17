@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
 import ProfileCard from "../../components/profile/ProfileCard";
@@ -6,6 +6,7 @@ import EditProfile from "../../components/profile/EditProfile";
 import Stats from "../../components/profile/Stats";
 import Modal from "../../components/common/Modal";
 import { useAuth } from "../../context/AuthContext";
+import API from "../../utils/api";
 
 const ListItem = ({ title, subtitle, tag, tagColor }) => (
   <div style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-3)", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -24,6 +25,8 @@ const ListItem = ({ title, subtitle, tag, tagColor }) => (
 export default function StudentProfile() {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const [membershipsLoading, setMembershipsLoading] = useState(false);
+  const [activeMembershipList, setActiveMembershipList] = useState([]);
   const pendingRequests = user?.connectionRequests?.filter(r => r.status === 'pending') || [];
   const resolvedRequests = user?.connectionRequests?.filter(r => r.status !== 'pending') || [];
 
@@ -36,14 +39,46 @@ export default function StudentProfile() {
 
   const [open, setOpen] = useState(false);
   const [membershipModalOpen, setMembershipModalOpen] = useState(false);
-  const activeMembershipList = user?.activeMembershipList || [
-    { id: 1, name: "Rahul Sharma", company: "Google", plan: "Monthly", since: "Jan 2026", amount: "Rs.199/mo" },
-    { id: 2, name: "Meera Pillai", company: "Flipkart", plan: "Monthly", since: "Mar 2026", amount: "Rs.199/mo" },
-  ];
-  const previousMembershipList = user?.previousMembershipList || [
-    { id: 3, name: "Karan Bhatia", company: "Microsoft", endedOn: "Dec 2025", amount: "Rs.199/mo" },
-  ];
-  const activeMemberships = user?.activeMemberships ?? activeMembershipList.length;
+  const previousMembershipList = [];
+  const activeMemberships = activeMembershipList.length;
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchMemberships = async () => {
+      setMembershipsLoading(true);
+      try {
+        const res = await API.get("/users/alumni-memberships");
+        const alumni = res?.data?.alumni || [];
+
+        const active = alumni
+          .filter((a) => Boolean(a.membershipTaken || a.subscribed))
+          .map((a) => ({
+            id: a._id,
+            name: a.name || "Alumni",
+            company: a.company || "Company not available",
+            plan: "Monthly",
+            since: a.membershipTakenAt
+              ? new Date(a.membershipTakenAt).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "Active",
+            amount: "₹199/mo",
+          }));
+
+        setActiveMembershipList(active);
+      } catch (err) {
+        console.error("Failed to load membership list:", err);
+        setActiveMembershipList([]);
+      } finally {
+        setMembershipsLoading(false);
+      }
+    };
+
+    fetchMemberships();
+  }, [user]);
 
   const handleAvatarChange = async (base64) => {
     try {
@@ -192,7 +227,11 @@ export default function StudentProfile() {
                 Active Memberships ({activeMembershipList.length})
               </h4>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {activeMembershipList.length === 0 ? (
+                {membershipsLoading ? (
+                  <div style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text-3)", fontSize: 13 }}>
+                    Loading memberships...
+                  </div>
+                ) : activeMembershipList.length === 0 ? (
                   <div style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text-3)", fontSize: 13 }}>
                     You have no active memberships.
                   </div>

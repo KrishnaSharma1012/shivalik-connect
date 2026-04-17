@@ -255,12 +255,29 @@ export function getAcademicItemKey(item) {
   return `${type}:${item.id ?? item.title}`;
 }
 
+function resolveAcademicType(item) {
+  const explicitType = String(item?.type || "").toLowerCase();
+  if (explicitType.includes("course")) return "course";
+  if (explicitType.includes("session") || explicitType.includes("workshop")) return "session";
+
+  if (Array.isArray(item?.syllabus) || Array.isArray(item?.assignments)) return "course";
+  if (item?.date || item?.time || item?.scheduledAt) return "session";
+
+  // Default to course to avoid hitting session enrollment for course cards missing type.
+  return "course";
+}
+
 export async function enrollAcademicItem(item, paymentDetails = {}) {
   if (!item) return;
-  const isCourse = item.type === "course" || item.modules; 
-  const type = isCourse ? "courses" : "sessions";
+  const itemId = item._id || item.id;
+  if (!itemId) {
+    throw new Error("Missing academic item id for enrollment");
+  }
+
+  const type = resolveAcademicType(item) === "course" ? "courses" : "sessions";
+
   try {
-    const res = await API.post(`/${type}/${item.id}/enroll`, {
+    const res = await API.post(`/${type}/${itemId}/enroll`, {
       paymentMethod: paymentDetails.method || "upi",
       amountPaid: item.price,
       paymentId: paymentDetails.id || `PAY-${Math.random().toString(16).slice(2).toUpperCase()}`
@@ -282,7 +299,7 @@ export function isAcademicItemEnrolled(item, user) {
   const itemId = (item.id || item._id)?.toString();
   if (!itemId) return false;
 
-  const isCourse = item.type === "course" || item.modules; 
+  const isCourse = resolveAcademicType(item) === "course";
   
   if (isCourse) {
     return (user.enrolledCourses || []).some(ec => {

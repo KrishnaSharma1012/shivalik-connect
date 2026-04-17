@@ -7,6 +7,28 @@ import { uploadImage } from "../config/cloudinary.js";
 
 const PLATFORM_CUT = Number(process.env.PLATFORM_CUT) || 0.20;
 const TOKEN_SESSION_COMPLETE = 20;
+const MEMBERSHIP_DISCOUNT_PERCENT = 15;
+
+const getMembershipAlumniIdSet = (student) => {
+  if (!student || !Array.isArray(student.takenMemberships)) return new Set();
+  return new Set(student.takenMemberships.map((m) => String(m.alumni)));
+};
+
+const applySessionMembershipDiscount = (session, membershipAlumniIds) => {
+  const instructorId = String(session?.instructor?._id || session?.instructor || "");
+  const hasMembershipDiscount = membershipAlumniIds.has(instructorId);
+  const basePrice = Number(session.price || 0);
+  const discountedPrice = hasMembershipDiscount
+    ? Math.max(0, Math.round(basePrice * (100 - MEMBERSHIP_DISCOUNT_PERCENT) / 100))
+    : basePrice;
+
+  return {
+    ...session,
+    hasMembershipDiscount,
+    membershipDiscountPercent: hasMembershipDiscount ? MEMBERSHIP_DISCOUNT_PERCENT : 0,
+    discountedPrice,
+  };
+};
 
 // ─────────────────────────────────────────────
 // GET SESSIONS
@@ -27,8 +49,15 @@ export const getSessions = async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
 
+    let mappedSessions = sessions.map((session) => session.toObject());
+    if (req.user?.role === "student") {
+      const student = await Student.findById(req.user._id).select("takenMemberships");
+      const membershipAlumniIds = getMembershipAlumniIdSet(student);
+      mappedSessions = mappedSessions.map((session) => applySessionMembershipDiscount(session, membershipAlumniIds));
+    }
+
     res.json({
-      sessions,
+      sessions: mappedSessions,
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
@@ -182,8 +211,21 @@ export const enrollSession = async (req, res) => {
       return res.status(400).json({ message: "No seats available" });
     }
 
-    const { paymentMethod, amountPaid, paymentId } = req.body;
-    const grossAmount = Number(amountPaid) || session.price;
+    // 1. Update Student doc (this gives the access)
+    const student = await Student.findById(userId);
+    if (!student) return res.status(404).json({ message: "Student account not found" });
+
+    const hasMembershipDiscount = (student.takenMemberships || []).some(
+      (item) => String(item.alumni) === String(session.instructor)
+    );
+    const discountPercent = hasMembershipDiscount ? MEMBERSHIP_DISCOUNT_PERCENT : 0;
+    const basePrice = Number(session.price || 0);
+    const payableAmount = hasMembershipDiscount
+      ? Math.max(0, Math.round(basePrice * (100 - MEMBERSHIP_DISCOUNT_PERCENT) / 100))
+      : basePrice;
+
+    const { paymentMethod, paymentId } = req.body;
+    const grossAmount = payableAmount;
     const platformFee = Math.round(grossAmount * PLATFORM_CUT);
 
     const enrollmentData = {
@@ -193,10 +235,6 @@ export const enrollSession = async (req, res) => {
       amountPaid: grossAmount,
       enrolledAt: new Date()
     };
-
-    // 1. Update Student doc (this gives the access)
-    const student = await Student.findById(userId);
-    if (!student) return res.status(404).json({ message: "Student account not found" });
 
     const alreadyEnrolledInStudent = student.enrolledSessions.some(e => e.session?.toString() === session._id.toString());
     if (!alreadyEnrolledInStudent) {
@@ -228,8 +266,15 @@ export const enrollSession = async (req, res) => {
     });
 
     res.json({
-      message: "Enrolled successfully",
+      message: hasMembershipDiscount
+        ? `Enrolled successfully with ${MEMBERSHIP_DISCOUNT_PERCENT}% membership discount.`
+        : "Enrolled successfully",
       seatsLeft: session.totalSeats - session.enrolledStudents.length,
+      pricing: {
+        basePrice,
+        discountPercent,
+        amountPaid: grossAmount,
+      },
     });
   } catch (err) {
     console.error("Enrollment error:", err);

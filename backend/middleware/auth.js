@@ -64,3 +64,36 @@ export const premiumGuard = (req, res, next) => {
   }
   next();
 };
+
+// ── Optional protect: attach user if JWT exists, otherwise continue ──
+export const optionalProtect = async (req, res, next) => {
+  try {
+    let token;
+
+    if (req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies?.connect_token) {
+      token = req.cookies.connect_token;
+    }
+
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId || decoded.id;
+
+    const user = await (
+      (await Student.findById(userId).select("-password")) ||
+      (await Alumni.findById(userId).select("-password")) ||
+      (await Admin.findById(userId).select("-password"))
+    );
+
+    req.user = user || null;
+    return next();
+  } catch (err) {
+    req.user = null;
+    return next();
+  }
+};
