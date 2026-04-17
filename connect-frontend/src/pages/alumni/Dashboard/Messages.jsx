@@ -88,7 +88,7 @@ export default function AlumniMessages() {
         unread: c.unread,
         avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
         color: "#7C5CFC",
-        subscribed: c.partner?.role === "student"
+        subscribed: Boolean(c.partner?.membershipTaken || c.partner?.subscribed)
       })).filter(c => c.id);
       setConversations(formatted);
       
@@ -100,7 +100,22 @@ export default function AlumniMessages() {
       if (userParam) {
         const existing = currentList.find(c => c.id === userParam);
         if (existing) setActiveChat(existing);
-        else setActiveChat({ id: userParam, name: "New Conversation", company: "Start chatting...", avatar: "N", color: "#7C5CFC", subscribed: true });
+        else {
+          try {
+            const userRes = await API.get(`/users/${userParam}`);
+            const profile = userRes?.data?.user || {};
+            setActiveChat({
+              id: userParam,
+              name: profile.name || "New Conversation",
+              company: profile.company || profile.role || "Start chatting...",
+              avatar: profile.name ? profile.name[0].toUpperCase() : "N",
+              color: "#7C5CFC",
+              subscribed: Boolean(profile.membershipTaken || profile.subscribed),
+            });
+          } catch {
+            setActiveChat({ id: userParam, name: "New Conversation", company: "Start chatting...", avatar: "N", color: "#7C5CFC", subscribed: true });
+          }
+        }
       } else if (currentList.length > 0 && !activeChat) {
         setActiveChat(currentList[0]);
       } else if (currentList.length === 0) {
@@ -125,7 +140,7 @@ export default function AlumniMessages() {
       const res = await API.get(`/messages/${userId}`);
       const fetched = res.data.messages || [];
       const formatted = fetched.map(m => ({
-        sender: m.sender._id === userId ? "them" : "me",
+        sender: String(m.sender?._id || m.sender) === String(userId) ? "them" : "me",
         text: m.content,
         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
       }));

@@ -4,6 +4,7 @@ import CrownIcon from "../../../components/common/CrownIcon";
 import Loader from "../../../components/common/Loader";
 import { useLocation } from "react-router-dom";
 import { getConversations, getMessages, sendMessage } from "../../../services/chatService";
+import API from "../../../utils/api";
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,7 +70,7 @@ export default function StudentMessages() {
         unread: c.unread,
         avatar: c.partner?.name ? c.partner.name[0].toUpperCase() : "U",
         color: "#7C5CFC",
-        membershipTaken: c.partner?.alumniPlan === "premium"
+        membershipTaken: Boolean(c.partner?.membershipTaken || c.partner?.subscribed)
       })).filter(c => c.id);
       
       setConversations(formatted);
@@ -82,13 +83,26 @@ export default function StudentMessages() {
         if (existing) {
           setActiveChat(existing);
         } else {
-          setActiveChat({
-            id: userParam,
-            name: "New Conversation",
-            company: "Start chatting...",
-            avatar: "N",
-            color: "#7C5CFC"
-          });
+          try {
+            const userRes = await API.get(`/users/${userParam}`);
+            const profile = userRes?.data?.user || {};
+            setActiveChat({
+              id: userParam,
+              name: profile.name || "New Conversation",
+              company: profile.company || profile.role || "Start chatting...",
+              avatar: profile.name ? profile.name[0].toUpperCase() : "N",
+              color: "#7C5CFC",
+              membershipTaken: Boolean(profile.membershipTaken || profile.subscribed),
+            });
+          } catch {
+            setActiveChat({
+              id: userParam,
+              name: "New Conversation",
+              company: "Start chatting...",
+              avatar: "N",
+              color: "#7C5CFC",
+            });
+          }
         }
       } else if (formatted.length > 0 && !activeChat) {
         setActiveChat(formatted[0]);
@@ -110,7 +124,7 @@ export default function StudentMessages() {
     try {
       const data = await getMessages(userId);
       const formatted = (data.messages || []).map(m => ({
-         sender: m.sender?._id === userId || m.sender === userId ? "them" : "me",
+        sender: String(m.sender?._id || m.sender) === String(userId) ? "them" : "me",
          text: m.content,
          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: "2-digit" })
       }));

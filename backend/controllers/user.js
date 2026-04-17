@@ -1,4 +1,5 @@
 import Alumni from '../models/Alumni.js';
+import Student from '../models/Student.js';
 import Course from "../models/Course.js";
 import Session from "../models/Session.js";
 import { uploadImage } from "../config/cloudinary.js";
@@ -66,7 +67,56 @@ export const getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json({ user });
+    let userPayload = user.toObject ? user.toObject() : { ...user };
+
+    if (req.user?.role === "student" && userPayload.role === "alumni") {
+      const student = await Student.findById(req.user._id).select("takenMemberships");
+      const hasTakenMembership = (student?.takenMemberships || []).some(
+        (item) => String(item.alumni) === String(userPayload._id)
+      );
+      userPayload.membershipTaken = hasTakenMembership;
+      userPayload.subscribed = hasTakenMembership;
+    }
+
+    res.json({ user: userPayload });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// TAKE ALUMNI MEMBERSHIP (STUDENT)
+// ─────────────────────────────────────────────
+export const takeAlumniMembership = async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Only students can take membership." });
+    }
+
+    const alumniId = req.params.id;
+    const alumni = await Alumni.findById(alumniId).select("_id");
+    if (!alumni) {
+      return res.status(404).json({ message: "Alumni not found" });
+    }
+
+    const student = await Student.findById(req.user._id);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const alreadyTaken = (student.takenMemberships || []).some(
+      (item) => String(item.alumni) === String(alumniId)
+    );
+
+    if (!alreadyTaken) {
+      student.takenMemberships.push({ alumni: alumniId, takenAt: new Date() });
+      await student.save();
+    }
+
+    res.json({
+      message: alreadyTaken ? "Membership already active" : "Membership activated",
+      membershipTaken: true,
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
@@ -248,6 +298,85 @@ export const addReview = async (req, res) => {
     });
   } catch (err) {
     console.error("Add review error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET ALUMNI WITH MEMBERSHIP FLAG (AUTH)
+// ─────────────────────────────────────────────
+export const getAlumniWithMembership = async (req, res) => {
+  try {
+    const { name, college, page = 1, limit = 20 } = req.query;
+
+    const filter = { isSuspended: { $ne: true } };
+
+    if (name) {
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.name = { $regex: escapedName, $options: "i" };
+    }
+
+    if (college) {
+      filter.college = { $regex: college, $options: "i" };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const alumniRows = await Alumni.find(filter)
+      .select("name email college company role avatar about skills alumniPlan alumniMembershipActive")
+      .skip(skip)
+      .limit(Number(limit))
+      .sort({ isVerified: -1, createdAt: -1 })
+      .lean();
+
+    let membershipSet = new Set();
+    if (req.user?.role === "student") {
+      const student = await Student.findById(req.user._id).select("takenMemberships").lean();
+      membershipSet = new Set((student?.takenMemberships || []).map((item) => String(item.alumni)));
+    }
+
+    const alumni = alumniRows.map((row) => ({
+      ...row,
+      membershipTaken: membershipSet.has(String(row._id)),
+      subscribed: membershipSet.has(String(row._id)),
+      priceMonth: 199,
+    }));
+
+    res.json({ alumni });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// ACTIVATE ALUMNI MEMBERSHIP (ALUMNI)
+// ─────────────────────────────────────────────
+export const activateAlumniMembership = async (req, res) => {
+  try {
+    if (req.user.role !== "alumni") {
+      return res.status(403).json({ message: "Only alumni can activate membership." });
+    }
+
+    const alumni = await Alumni.findById(req.user._id);
+    if (!alumni) {
+      return res.status(404).json({ message: "Alumni not found" });
+    }
+
+    if (!alumni.alumniMembershipActive) {
+      alumni.alumniMembershipActive = true;
+      alumni.alumniMembershipStartedAt = new Date();
+      if (alumni.alumniPlan !== "premium") {
+        alumni.alumniPlan = "premium";
+      }
+      await alumni.save();
+    }
+
+    res.json({
+      message: "Alumni membership activated",
+      alumniMembershipActive: true,
+      user: alumni,
+    });
+  } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };

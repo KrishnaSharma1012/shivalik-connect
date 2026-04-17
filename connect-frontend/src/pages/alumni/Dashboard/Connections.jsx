@@ -147,7 +147,7 @@ export default function AlumniConnections() {
                   </div>
 
                   <button
-                    onClick={() => navigate(`/messages?user=${student._id}`)}
+                    onClick={() => navigate(`/alumni/dashboard/messages?user=${student._id}`)}
                     style={{
                       padding: "8px 12px",
                       borderRadius: 10,

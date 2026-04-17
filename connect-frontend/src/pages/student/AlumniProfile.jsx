@@ -705,8 +705,14 @@ export default function StudentAlumniProfile() {
           price: alumni?.priceMonth || 199,
         }}
         skipEnrollment
-        onPaymentSuccess={() => {
-          setMembershipTaken(true);
+        onPaymentSuccess={async () => {
+          try {
+            await API.post(`/users/${alumniId}/membership`);
+            setMembershipTaken(true);
+          } catch (err) {
+            console.error("Failed to activate membership", err);
+            alert(err?.response?.data?.message || "Membership activation failed.");
+          }
         }}
       />
     </MainLayout>

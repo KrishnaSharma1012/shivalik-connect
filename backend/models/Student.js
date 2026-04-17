@@ -29,6 +29,11 @@ const connectionRequestSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const takenMembershipSchema = new mongoose.Schema({
+  alumni: { type: mongoose.Schema.Types.ObjectId, ref: "Alumni", required: true },
+  takenAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 // ── Student Schema ───────────────────────────────────────────
 
 const studentSchema = new mongoose.Schema({
@@ -59,6 +64,8 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Alumni',
   }],
+
+  takenMemberships: [takenMembershipSchema],
 
   isCollegePartner: { type: Boolean, default: false },
   has24hReply: { type: Boolean, default: false },

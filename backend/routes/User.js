@@ -1,11 +1,14 @@
 import express from "express";
 import {
   getAlumni,
+  getAlumniWithMembership,
   getUserById,
   updateProfile,
   upgradePlan,
   getEnrolledItems,
   addReview,
+  takeAlumniMembership,
+  activateAlumniMembership,
 } from "../controllers/user.js";
 
 import { protect } from "../middleware/auth.js";
@@ -24,6 +27,9 @@ router.get("/alumni", getAlumni);
 // ─────────────────────────────
 router.use(protect);
 
+// Get alumni list with membership flag for current user
+router.get("/alumni-memberships", getAlumniWithMembership);
+
 // Update profile (includes avatar upload already)
 router.put("/profile", updateProfile);
 
@@ -32,6 +38,12 @@ router.patch("/upgrade-plan", upgradePlan);
 
 // Add review to an alumni
 router.post("/:id/review", addReview);
+
+// Student takes alumni membership
+router.post("/:id/membership", takeAlumniMembership);
+
+// Alumni activates own membership
+router.post("/membership/activate", activateAlumniMembership);
 
 // Get enrolled items (courses + sessions)
 router.get("/me/enrolled", getEnrolledItems);

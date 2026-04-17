@@ -235,7 +235,7 @@ export default function PostCard({ post, onOpenProfile }) {
         <CertificateBadge title={post.certTitle} issuer={post.certIssuer} date={post.certDate} />
       )}
 
-      {/* Legacy certificate (dummy data) */}
+      {/* Legacy certificate payload support */}
       {post.certificate && (
         <CertificateBadge title={post.certificate.title} issuer={post.certificate.issuer} date={post.certificate.date} />
       )}

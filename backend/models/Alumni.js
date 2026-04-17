@@ -57,6 +57,8 @@ const alumniSchema = new mongoose.Schema({
   degree: { type: String, default: "" },
   branch: { type: String, default: "" },
   alumniPlan: { type: String, enum: ["simple", "premium"], default: "simple" },
+  alumniMembershipActive: { type: Boolean, default: false },
+  alumniMembershipStartedAt: { type: Date, default: null },
 
   availability: [{
     day: { type: String, enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },

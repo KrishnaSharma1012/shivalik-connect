@@ -75,7 +75,7 @@ const allNavItems = [
   { name: "Messages", path: "/alumni/dashboard/messages", freeAccess: true,  badge: 1 },
   { name: "Sessions",   path: "/alumni/dashboard/sessions",   freeAccess: false },
   { name: "Earnings",   path: "/alumni/dashboard/earnings",   freeAccess: false },
-  { name: "Membership", path: "/alumni/dashboard/membership", freeAccess: false, label: "Membership" },
+  { name: "Membership", path: "/alumni/dashboard/membership", freeAccess: true, label: "Membership" },
   { name: "Profile",    path: "/alumni/profile",              freeAccess: true  },
 ];
 
