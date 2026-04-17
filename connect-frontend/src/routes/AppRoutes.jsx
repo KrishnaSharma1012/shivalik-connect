@@ -11,6 +11,7 @@ import Signup from "../pages/auth/Signup";
 // Student Pages
 import Feed from "../pages/student/Dashboard/Feed";
 import Networking from "../pages/student/Dashboard/Networking";
+import StudentConnections from "../pages/student/Dashboard/Connections";
 import Academics from "../pages/student/Dashboard/Academics";
 import Messages from "../pages/student/Dashboard/Messages";
 import StudentProfile from "../pages/student/Profile";
@@ -26,6 +27,8 @@ import CareerPath from "../pages/student/Dashboard/CareerPath";
 import AlumniFeed from "../pages/alumni/Dashboard/Feed";
 import AlumniMessages from "../pages/alumni/Dashboard/Messages";
 import MyPosts from "../pages/alumni/Dashboard/MyPosts";
+import ConnectionRequests from "../pages/alumni/Dashboard/ConnectionRequests";
+import AlumniConnections from "../pages/alumni/Dashboard/Connections";
 import Sessions from "../pages/alumni/Dashboard/Sessions";
 import Earnings from "../pages/alumni/Dashboard/Earnings";
 import AlumniMembershipPage from "../pages/alumni/Dashboard/Membership";
@@ -77,6 +80,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Networking />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/connections"
+        element={
+          <ProtectedRoute>
+            <StudentConnections />
           </ProtectedRoute>
         }
       />
@@ -186,6 +198,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AlumniMessages />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/alumni/dashboard/connection-requests"
+        element={
+          <ProtectedRoute>
+            <ConnectionRequests />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/alumni/dashboard/connections"
+        element={
+          <ProtectedRoute>
+            <AlumniConnections />
           </ProtectedRoute>
         }
       />

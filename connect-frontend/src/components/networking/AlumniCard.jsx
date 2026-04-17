@@ -46,10 +46,13 @@ export default function AlumniCard({ alumni }) {
     setLoading(true);
     try {
       const id = alumni._id || alumni.id;
-      await API.post(`/connections/${id}`);
-      setStatus("pending");
+      const res = await API.post(`/connections/${id}`);
+      const nextStatus = res?.data?.connection?.status;
+      setStatus(nextStatus === "accepted" ? "connected" : "pending");
     } catch (err) {
       console.error("Connection request failed", err);
+      const message = err?.response?.data?.message || "Could not send request. Please try again.";
+      alert(message);
     } finally {
       setLoading(false);
     }

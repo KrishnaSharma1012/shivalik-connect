@@ -5,6 +5,7 @@ import {
   rejectRequest,
   getMyConnections,
   getPendingRequests,
+  getMyPendingConnections,
   getConnectionStatus,
 } from "../controllers/connection.js";
 
@@ -34,6 +35,9 @@ router.get("/", protect, getMyConnections);
 
 // Pending requests
 router.get("/pending", protect, getPendingRequests);
+
+// My pending (incoming + outgoing)
+router.get("/pending-all", protect, getMyPendingConnections);
 
 // Connection status (for button state)
 router.get("/status/:id", protect, getConnectionStatus);

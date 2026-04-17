@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
-import CrownIcon from "../../components/common/CrownIcon";
 import Loader from "../../components/common/Loader";
 import PostCard from "../../components/feed/PostCard";
 import PaymentModal from "../../components/academics/PaymentModal";
@@ -119,10 +118,13 @@ export default function StudentAlumniProfile() {
     if (connectStatus !== "connect" || connecting) return;
     setConnecting(true);
     try {
-      await API.post(`/connections/${alumniId}`);
-      setConnectStatus("pending");
+      const res = await API.post(`/connections/${alumniId}`);
+      const nextStatus = res?.data?.connection?.status;
+      setConnectStatus(nextStatus === "accepted" ? "connected" : "pending");
     } catch (err) {
       console.error(err);
+      const message = err?.response?.data?.message || "Could not send connection request.";
+      alert(message);
     } finally {
       setConnecting(false);
     }
@@ -203,6 +205,10 @@ export default function StudentAlumniProfile() {
   const availability = formatArray(alumni.availability);
   const sessionPricing = formatArray(alumni.sessionPricing);
   const alumniStats = alumni.stats || {};
+  const normalizedCollege = String(alumni.college || "").toLowerCase();
+  const isConnectVerifiedAlumni =
+    normalizedCollege.includes("ajay kumar garg engineering college") ||
+    normalizedCollege.includes("akgec");
 
   const detailRows = [
     { label: "Title", value: alumni.title },
@@ -267,7 +273,7 @@ export default function StudentAlumniProfile() {
           <div style={{ padding: "0 28px 28px" }}>
             {/* Avatar + actions row */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: -44, marginBottom: 20 }}>
-              {/* Avatar with verified ring */}
+              {/* Avatar */}
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div style={{
                   width: 88, height: 88, borderRadius: 22,
@@ -279,16 +285,6 @@ export default function StudentAlumniProfile() {
                 }}>
                   {initial}
                 </div>
-                {alumni.isVerified && (
-                  <div style={{
-                    position: "absolute", bottom: -2, right: -2,
-                    width: 22, height: 22, borderRadius: "50%",
-                    background: "var(--teal)", border: "3px solid var(--bg-3)",
-                    display: "flex", alignItems: "center", justifyContent: "center", color: "#000",
-                  }}>
-                    <CheckIcon />
-                  </div>
-                )}
               </div>
 
               {/* Action buttons */}
@@ -353,10 +349,31 @@ export default function StudentAlumniProfile() {
               <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 24, color: "var(--text)" }}>
                 {alumni.name}
               </h1>
-              {alumni.isVerified && <span className="badge-verified">✓ Verified Alumni</span>}
-              {alumni.alumniPlan === "premium" && (
-                <span style={{ display: "inline-flex", alignItems: "center" }}>
-                  <CrownIcon size={16} />
+              {isConnectVerifiedAlumni && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span className="badge-verified">Connect Verified</span>
+                  <button
+                    type="button"
+                    title="College tie ups results in verification"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      border: "1px solid rgba(0,229,195,0.35)",
+                      background: "rgba(0,229,195,0.1)",
+                      color: "var(--teal)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      cursor: "help",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
+                    }}
+                  >
+                    i
+                  </button>
                 </span>
               )}
             </div>
@@ -365,7 +382,6 @@ export default function StudentAlumniProfile() {
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <span style={{ fontSize: 13, color: "var(--text-3)" }}>🎓 {alumni.college}</span>
-              {alumni.has24hReply && <span className="badge-24h">⚡ Replies within 24h</span>}
               {allowsMembership && (
                 <span style={{ fontSize: 12, fontWeight: 700, color: membershipTaken ? "#10B981" : "#F5C842", background: membershipTaken ? "rgba(16,185,129,0.12)" : "rgba(245,200,66,0.12)", border: membershipTaken ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(245,200,66,0.3)", borderRadius: 99, padding: "4px 10px" }}>
                   {membershipTaken ? "Membership subscribed" : "Membership available"}
@@ -377,7 +393,7 @@ export default function StudentAlumniProfile() {
               {[
                 { label: "Email", value: alumni.email },
                 { label: "Role", value: alumni.role },
-                { label: "Verified", value: alumni.isVerified ? "Yes" : "No" },
+                { label: "Verified", value: isConnectVerifiedAlumni ? "Connect Verified" : "No" },
                 { label: "Premium", value: alumni.alumniPlan === "premium" ? "Premium" : "Simple" },
               ].map((item) => (
                 <div key={item.label} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>

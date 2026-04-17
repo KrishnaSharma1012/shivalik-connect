@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../utils/api";
@@ -31,6 +31,22 @@ const icons = {
       <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
     </svg>
   ),
+  ConnectionRequests: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 8v6"/>
+      <path d="M20 11h6"/>
+    </svg>
+  ),
+  Connections: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="8.5" cy="7" r="4"/>
+      <path d="M20 8v6"/>
+      <path d="M17 11h6"/>
+    </svg>
+  ),
   Profile: (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -54,6 +70,8 @@ const icons = {
 const allNavItems = [
   { name: "Feed",     path: "/alumni/dashboard/feed",     freeAccess: true  },
   { name: "MyPosts",  path: "/alumni/dashboard/my-posts", freeAccess: true, label: "My Posts" },
+  { name: "ConnectionRequests", path: "/alumni/dashboard/connection-requests", freeAccess: true, label: "Requests" },
+  { name: "Connections", path: "/alumni/dashboard/connections", freeAccess: true },
   { name: "Messages", path: "/alumni/dashboard/messages", freeAccess: true,  badge: 1 },
   { name: "Sessions",   path: "/alumni/dashboard/sessions",   freeAccess: false },
   { name: "Earnings",   path: "/alumni/dashboard/earnings",   freeAccess: false },
@@ -65,8 +83,25 @@ export default function AlumniSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   // Read from the correct field set during signup
   const isPremium = user?.alumniPlan === "premium";
+
+  useEffect(() => {
+    const fetchPendingRequests = async () => {
+      try {
+        const res = await API.get("/connections/pending");
+        setPendingRequestsCount((res.data.pending || []).length);
+      } catch {
+        setPendingRequestsCount(0);
+      }
+    };
+
+    fetchPendingRequests();
+    const intervalId = setInterval(fetchPendingRequests, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleLockedClick = () => {
     // Navigate to the locked page — the AlumniModelGate will show the upgrade UI
@@ -161,13 +196,13 @@ export default function AlumniSidebar() {
                   <span style={{ opacity: active ? 1 : 0.6, display: "flex" }}>{icons[item.name]}</span>
                   <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>{item.label || item.name}</span>
                 </div>
-                {item.badge && (
+                {(item.name === "ConnectionRequests" ? pendingRequestsCount : item.badge) ? (
                   <span style={{
                     background: "var(--orange)", color: "white",
                     borderRadius: 99, fontSize: 10, fontWeight: 700,
                     padding: "1px 6px", minWidth: 18, textAlign: "center",
-                  }}>{item.badge}</span>
-                )}
+                  }}>{item.name === "ConnectionRequests" ? pendingRequestsCount : item.badge}</span>
+                ) : null}
               </div>
             </Link>
           );

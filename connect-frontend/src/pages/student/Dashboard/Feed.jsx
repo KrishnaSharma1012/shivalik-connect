@@ -31,7 +31,16 @@ export default function Feed() {
   }, []);
 
   const openAlumniProfile = (post) => {
-    navigate(`/profile/${post.author._id}`);
+    const author = post?.author;
+    const alumniId = typeof author === "object" ? author?._id : author;
+    if (!alumniId) return;
+
+    navigate("/alumni-profile", {
+      state: {
+        alumniId,
+        alumni: typeof author === "object" ? author : undefined,
+      },
+    });
   };
 
   const filteredPosts = posts.filter((p) => {

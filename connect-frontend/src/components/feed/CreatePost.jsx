@@ -170,7 +170,18 @@ export default function CreatePost({ onAddPost }) {
           color: "white", fontSize: 16, fontWeight: 700, fontFamily: "Plus Jakarta Sans",
           border: "2px solid rgba(255,255,255,0.22)",
           boxShadow: "0 8px 18px rgba(124,92,252,0.34)",
-        }}>{avatarInitial}</div>
+          overflow: "hidden",
+        }}>
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user?.name || "User"}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          ) : (
+            avatarInitial
+          )}
+        </div>
 
         {/* Textarea */}
         <div style={{ flex: 1 }}>

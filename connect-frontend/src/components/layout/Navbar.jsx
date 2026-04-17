@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import API from "../../utils/api";
 const connectLogo = "/connect-logo.png";
 
 const SEARCH_INDEX = [
@@ -50,18 +51,29 @@ const SearchIcon = () => (
   </svg>
 );
 
-const notifications = [
-  { id: 1, text: "Rahul replied to your message", time: "2m ago", unread: true },
-  { id: 2, text: "New session: System Design – 25 Apr", time: "1h ago", unread: true },
-  { id: 3, text: "Ananya accepted your connection", time: "3h ago", unread: false },
-];
-
 const roleColors = { student: "#7C5CFC", alumni: "#FF7043", admin: "#00E5C3" };
+
+const formatRelativeTime = (dateValue) => {
+  if (!dateValue) return "Just now";
+  const time = new Date(dateValue).getTime();
+  if (Number.isNaN(time)) return "Just now";
+
+  const diffMs = Date.now() - time;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diffMs < minute) return "Just now";
+  if (diffMs < hour) return `${Math.max(1, Math.floor(diffMs / minute))}m ago`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  return `${Math.floor(diffMs / day)}d ago`;
+};
 
 export default function Navbar() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [showNotifs, setShowNotifs] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [showUser, setShowUser]   = useState(false);
   const [search, setSearch] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -69,7 +81,7 @@ export default function Navbar() {
   const userRef  = useRef();
   const searchRef = useRef();
 
-  // const searchItems = SEARCH_INDEX.filter(item => item.roles.includes(user?.role || "student"));
+  const searchItems = SEARCH_INDEX.filter(item => item.roles?.includes(user?.role || "student"));
   const searchResults = search
     ? searchItems
         .filter(item => {
@@ -96,6 +108,98 @@ export default function Navbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user?._id) {
+        setNotifications([]);
+        return;
+      }
+
+      const readKey = `navbar_notifications_read_${user._id}`;
+      let readIds = new Set();
+      try {
+        readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]"));
+      } catch {
+        readIds = new Set();
+      }
+
+      const [pendingResult, conversationsResult] = await Promise.allSettled([
+        API.get("/connections/pending"),
+        API.get("/messages/conversations"),
+      ]);
+
+      const nextNotifications = [];
+
+      if (pendingResult.status === "fulfilled") {
+        const pending = pendingResult.value?.data?.pending || [];
+        pending.forEach((request) => {
+          const fromUser = request.from || {};
+          const notifId = `conn-${request._id}`;
+          nextNotifications.push({
+            id: notifId,
+            text: `${fromUser.name || "Someone"} sent you a connection request`,
+            time: formatRelativeTime(request.createdAt || request.updatedAt),
+            timestamp: new Date(request.createdAt || request.updatedAt || Date.now()).getTime(),
+            unread: !readIds.has(notifId),
+            path: user.role === "alumni" ? "/alumni/dashboard/connection-requests" : "/networking",
+          });
+        });
+      }
+
+      if (conversationsResult.status === "fulfilled") {
+        const conversations = conversationsResult.value?.data?.conversations || [];
+        conversations
+          .filter((conv) => Number(conv.unread) > 0)
+          .forEach((conv) => {
+            const partner = conv.partner || {};
+            const lastTime = conv.lastTime || Date.now();
+            const notifId = `msg-${partner._id || "unknown"}-${new Date(lastTime).getTime()}`;
+            nextNotifications.push({
+              id: notifId,
+              text: `${partner.name || "Someone"} sent ${conv.unread} unread message${conv.unread > 1 ? "s" : ""}`,
+              time: formatRelativeTime(lastTime),
+              timestamp: new Date(lastTime).getTime(),
+              unread: !readIds.has(notifId),
+              path: user.role === "alumni" ? "/alumni/dashboard/messages" : "/messages",
+            });
+          });
+      }
+
+      nextNotifications.sort((a, b) => b.timestamp - a.timestamp);
+      setNotifications(nextNotifications.slice(0, 10));
+    };
+
+    fetchNotifications();
+    const intervalId = setInterval(fetchNotifications, 15000);
+    const onFocus = () => fetchNotifications();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [user?._id, user?.role]);
+
+  const persistReadIds = (updatedNotifications) => {
+    if (!user?._id) return;
+    const readKey = `navbar_notifications_read_${user._id}`;
+    const readIds = updatedNotifications.filter((n) => !n.unread).map((n) => n.id);
+    localStorage.setItem(readKey, JSON.stringify(readIds));
+  };
+
+  const handleMarkAllRead = () => {
+    const updated = notifications.map((n) => ({ ...n, unread: false }));
+    setNotifications(updated);
+    persistReadIds(updated);
+  };
+
+  const handleNotificationClick = (notification) => {
+    const updated = notifications.map((n) => n.id === notification.id ? { ...n, unread: false } : n);
+    setNotifications(updated);
+    persistReadIds(updated);
+    setShowNotifs(false);
+    if (notification.path) navigate(notification.path);
+  };
 
   const handleLogout = () => { logout(); navigate("/"); };
   const unreadCount  = notifications.filter(n => n.unread).length;
@@ -292,26 +396,38 @@ export default function Navbar() {
             }}>
               <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 14 }}>Notifications</span>
-                <span style={{ fontSize: 11, color: "var(--purple-light)", cursor: "pointer", fontWeight: 600 }}>Mark all read</span>
-              </div>
-              {notifications.map(n => (
-                <div key={n.id} style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex", gap: 10, alignItems: "flex-start",
-                  background: n.unread ? "rgba(124,92,252,0.05)" : "transparent",
-                  cursor: "pointer", transition: "background 0.15s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
-                  onMouseLeave={e => e.currentTarget.style.background = n.unread ? "rgba(124,92,252,0.05)" : "transparent"}
+                <span
+                  style={{ fontSize: 11, color: "var(--purple-light)", cursor: "pointer", fontWeight: 600 }}
+                  onClick={handleMarkAllRead}
                 >
-                  {n.unread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--purple)", flexShrink: 0, marginTop: 5 }} />}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.4 }}>{n.text}</p>
-                    <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{n.time}</p>
-                  </div>
+                  Mark all read
+                </span>
+              </div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: "14px 16px", fontSize: 12, color: "var(--text-3)" }}>
+                  You are all caught up.
                 </div>
-              ))}
+              ) : (
+                notifications.map(n => (
+                  <div key={n.id} style={{
+                    padding: "12px 16px",
+                    borderBottom: "1px solid var(--border)",
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                    background: n.unread ? "rgba(124,92,252,0.05)" : "transparent",
+                    cursor: "pointer", transition: "background 0.15s",
+                  }}
+                    onClick={() => handleNotificationClick(n)}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                    onMouseLeave={e => e.currentTarget.style.background = n.unread ? "rgba(124,92,252,0.05)" : "transparent"}
+                  >
+                    {n.unread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--purple)", flexShrink: 0, marginTop: 5 }} />}
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.4 }}>{n.text}</p>
+                      <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{n.time}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

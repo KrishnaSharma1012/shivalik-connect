@@ -1,5 +1,6 @@
 import Connection from "../models/Connection.js";
 import Alumni from '../models/Alumni.js';
+import { findUserById } from "../utils/userModels.js";
 
 const roleToModel = {
   student: "Student",
@@ -29,19 +30,71 @@ export const sendRequest = async (req, res) => {
       return res.status(404).json({ message: "Alumni not found" });
     }
 
-    const existing = await Connection.findOne({
-      $or: [
-        { from: studentId, to: alumniId },
-        { from: alumniId, to: studentId },
-      ],
-    });
+    const [existingDirect, existingReverse] = await Promise.all([
+      Connection.findOne({ from: studentId, to: alumniId }),
+      Connection.findOne({ from: alumniId, to: studentId }),
+    ]);
 
-    if (existing) {
+    if (existingDirect) {
+      if (existingDirect.status === "rejected") {
+        existingDirect.fromModel = fromModel;
+        existingDirect.toModel = "Alumni";
+        existingDirect.status = "pending";
+        await existingDirect.save();
+
+        return res.status(200).json({
+          message: "Connection request sent",
+          connection: {
+            _id: existingDirect._id,
+            from: existingDirect.from,
+            to: existingDirect.to,
+            status: existingDirect.status,
+          },
+        });
+      }
+
       return res.status(409).json({
         message:
-          existing.status === "accepted"
+          existingDirect.status === "accepted"
             ? "Already connected"
             : "Request already exists",
+      });
+    }
+
+    if (existingReverse) {
+      if (existingReverse.status === "pending") {
+        existingReverse.status = "accepted";
+        await existingReverse.save();
+        return res.status(200).json({
+          message: "Connected successfully",
+          connection: {
+            _id: existingReverse._id,
+            from: existingReverse.from,
+            to: existingReverse.to,
+            status: existingReverse.status,
+          },
+        });
+      }
+
+      if (existingReverse.status === "accepted") {
+        return res.status(409).json({ message: "Already connected" });
+      }
+
+      existingReverse.from = studentId;
+      existingReverse.fromModel = fromModel;
+      existingReverse.to = alumniId;
+      existingReverse.toModel = "Alumni";
+      existingReverse.status = "pending";
+      await existingReverse.save();
+
+      return res.status(200).json({
+        message: "Connection request sent",
+        connection: {
+          _id: existingReverse._id,
+          from: existingReverse.from,
+          to: existingReverse.to,
+          status: existingReverse.status,
+        },
       });
     }
 
@@ -120,18 +173,61 @@ export const rejectRequest = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getMyConnections = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const safeFindUserById = async (id) => {
+      try {
+        if (!id) return null;
+        return await findUserById(id);
+      } catch {
+        return null;
+      }
+    };
 
-    const connections = await Connection.find({
-      $or: [{ from: userId }, { to: userId }],
-      status: "accepted",
-    })
-      .populate("from", "name avatar role college company")
-      .populate("to", "name avatar role college company")
-      .sort({ updatedAt: -1 });
+    const currentUserId = String(req.user._id);
+
+    const acceptedRows = await Connection.find({ status: "accepted" })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const myAcceptedRows = acceptedRows.filter(
+      (row) => String(row.from) === currentUserId || String(row.to) === currentUserId
+    );
+
+    const connectionsRaw = await Promise.all(
+      myAcceptedRows.map(async (row) => {
+        const [fromUser, toUser] = await Promise.all([
+          safeFindUserById(row.from),
+          safeFindUserById(row.to),
+        ]);
+
+        if (!fromUser?._id || !toUser?._id) return null;
+
+        return {
+          ...row,
+          from: {
+            _id: fromUser._id,
+            name: fromUser.name,
+            avatar: fromUser.avatar,
+            role: fromUser.role,
+            college: fromUser.college,
+            company: fromUser.company,
+          },
+          to: {
+            _id: toUser._id,
+            name: toUser.name,
+            avatar: toUser.avatar,
+            role: toUser.role,
+            college: toUser.college,
+            company: toUser.company,
+          },
+        };
+      })
+    );
+
+    const connections = connectionsRaw.filter(Boolean);
 
     res.json({ connections });
   } catch (err) {
+    console.error("getMyConnections error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -141,13 +237,47 @@ export const getMyConnections = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getPendingRequests = async (req, res) => {
   try {
-    const pending = await Connection.find({
-      to: req.user._id,
-      status: "pending",
-    }).populate("from", "name avatar role college");
+    const safeFindUserById = async (id) => {
+      try {
+        if (!id) return null;
+        return await findUserById(id);
+      } catch {
+        return null;
+      }
+    };
+
+    const currentUserId = String(req.user._id);
+
+    // Use lean data and manual matching to avoid refPath/populate model mismatch crashes.
+    const allPending = await Connection.find({ status: "pending" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const myPendingRows = allPending.filter((row) => String(row.to) === currentUserId);
+
+    const pendingRaw = await Promise.all(
+      myPendingRows.map(async (row) => {
+        const fromUser = await safeFindUserById(row.from);
+        if (!fromUser?._id) return null;
+
+        return {
+          ...row,
+          from: {
+            _id: fromUser._id,
+            name: fromUser.name,
+            avatar: fromUser.avatar,
+            role: fromUser.role,
+            college: fromUser.college,
+          },
+        };
+      })
+    );
+
+    const pending = pendingRaw.filter(Boolean);
 
     res.json({ pending });
   } catch (err) {
+    console.error("getPendingRequests error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -172,6 +302,62 @@ export const getConnectionStatus = async (req, res) => {
     }
 
     res.json({ status: connection.status });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET MY PENDING (INCOMING + OUTGOING)
+// ─────────────────────────────────────────────
+export const getMyPendingConnections = async (req, res) => {
+  try {
+    const safeFindUserById = async (id) => {
+      try {
+        if (!id) return null;
+        return await findUserById(id);
+      } catch {
+        return null;
+      }
+    };
+
+    const currentUserId = String(req.user._id);
+
+    const pendingRows = await Connection.find({ status: "pending" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const myRows = pendingRows.filter(
+      (row) => String(row.from) === currentUserId || String(row.to) === currentUserId
+    );
+
+    const pendingRaw = await Promise.all(
+      myRows.map(async (row) => {
+        const isOutgoing = String(row.from) === currentUserId;
+        const partnerId = isOutgoing ? row.to : row.from;
+        const partner = await safeFindUserById(partnerId);
+
+        if (!partner?._id) return null;
+
+        return {
+          _id: row._id,
+          direction: isOutgoing ? "outgoing" : "incoming",
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          partner: {
+            _id: partner._id,
+            name: partner.name,
+            avatar: partner.avatar,
+            role: partner.role,
+            college: partner.college,
+            company: partner.company,
+          },
+        };
+      })
+    );
+
+    const pending = pendingRaw.filter(Boolean);
+    res.json({ pending });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }

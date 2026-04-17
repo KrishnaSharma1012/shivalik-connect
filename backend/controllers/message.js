@@ -38,7 +38,7 @@ export const getConversations = async (req, res) => {
                 {
                   $and: [
                     { $eq: ["$receiver", userId] },
-                    { $eq: ["$read", false] },
+                    { $eq: ["$isRead", false] },
                   ],
                 },
                 1,
@@ -96,8 +96,8 @@ export const getMessages = async (req, res) => {
 
     // mark as read
     await Message.updateMany(
-      { sender: userId, receiver: me, read: false },
-      { read: true }
+      { sender: userId, receiver: me, isRead: false },
+      { isRead: true }
     );
 
     res.json({ messages });
@@ -143,8 +143,8 @@ export const markAsRead = async (req, res) => {
     const me = req.user._id;
 
     await Message.updateMany(
-      { sender: userId, receiver: me, read: false },
-      { read: true }
+      { sender: userId, receiver: me, isRead: false },
+      { isRead: true }
     );
 
     res.json({ message: "Messages marked as read" });
