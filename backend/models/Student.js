@@ -19,19 +19,19 @@ const enrolledSessionSchema = new mongoose.Schema({
   amountPaid:    { type: Number, default: 0 },
 }, { _id: false });
 
-const connectionRequestSchema = new mongoose.Schema({
-  alumni:  { type: mongoose.Schema.Types.ObjectId, ref: 'Alumni' },
-  sentAt:  { type: Date, default: Date.now },
-  status:  {
-    type: String,
-    enum: ['pending', 'accepted', 'rejected'],
-    default: 'pending',
-  },
-}, { _id: false });
-
 const takenMembershipSchema = new mongoose.Schema({
   alumni: { type: mongoose.Schema.Types.ObjectId, ref: "Alumni", required: true },
   takenAt: { type: Date, default: Date.now },
+}, { _id: false });
+
+const educationSchema = new mongoose.Schema({
+  institution: { type: String, default: "" },
+  degree: { type: String, default: "" },
+  fieldOfStudy: { type: String, default: "" },
+  startYear: { type: Number },
+  endYear: { type: Number },
+  grade: { type: String, default: "" },
+  description: { type: String, default: "" },
 }, { _id: false });
 
 // ── Student Schema ───────────────────────────────────────────
@@ -47,6 +47,8 @@ const studentSchema = new mongoose.Schema({
   title: { type: String, default: "" },
   headline: { type: String, default: "" },
   skills: [String],
+  certifications: [String],
+  education: [educationSchema],
   college: { type: String, default: "" },
   company: { type: String, default: "" },
   tokens: { type: Number, default: 0 },
@@ -55,11 +57,13 @@ const studentSchema = new mongoose.Schema({
 
   year: { type: Number, min: 1, max: 5, default: 1 },
   branch: { type: String, default: '' },
+  joiningYear: { type: Number },
+  passingYear: { type: Number },
+  degree: { type: String, default: "" },
 
   enrolledCourses: [enrolledCourseSchema],
   enrolledSessions: [enrolledSessionSchema],
 
-  connectionRequests: [connectionRequestSchema],
   connections: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Alumni',

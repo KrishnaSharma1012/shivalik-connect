@@ -36,7 +36,7 @@ BASE_DIR = Path(__file__).resolve().parent
 df = pd.read_csv(BASE_DIR / "data" / "processed" / "jobs_production.csv")
 embeddings = np.load(BASE_DIR / "models" / "job_embeddings_production.npy")
 
-print(f"✅ Ready — {len(df)} jobs loaded")
+print(f"Ready - {len(df)} jobs loaded")
 print(f"   Domains: {df['domain'].value_counts().to_dict()}")
 
 # ── Available domains (now 8, up from 6) ─────────────────────

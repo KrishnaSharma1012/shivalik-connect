@@ -30,6 +30,26 @@ const connectionRequestSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const educationSchema = new mongoose.Schema({
+  institution: { type: String, default: "" },
+  degree: { type: String, default: "" },
+  fieldOfStudy: { type: String, default: "" },
+  startYear: { type: Number },
+  endYear: { type: Number },
+  grade: { type: String, default: "" },
+  description: { type: String, default: "" },
+}, { _id: false });
+
+const projectSchema = new mongoose.Schema({
+  title: { type: String, default: "" },
+  link: { type: String, default: "" },
+  description: { type: String, default: "" },
+  fileUrl: { type: String, default: "" },
+  fileName: { type: String, default: "" },
+  fileType: { type: String, default: "" },
+  uploadedAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 // ── Alumni Schema ────────────────────────────────────────────
 
 const alumniSchema = new mongoose.Schema({
@@ -43,6 +63,9 @@ const alumniSchema = new mongoose.Schema({
   title: { type: String, default: "" },
   headline: { type: String, default: "" },
   skills: [String],
+  certifications: [String],
+  education: [educationSchema],
+  projects: [projectSchema],
   college: { type: String, default: "" },
   company: { type: String, default: "" },
   tokens: { type: Number, default: 0 },

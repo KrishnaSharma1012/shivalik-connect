@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MainLayout from "../../components/layout/MainLayout";
 import ProfileCard from "../../components/profile/ProfileCard";
 import EditProfile from "../../components/profile/EditProfile";
+import ProfileCompletion from "../../components/profile/ProfileCompletion";
 import Stats from "../../components/profile/Stats";
 import Modal from "../../components/common/Modal";
 import { useAuth } from "../../context/AuthContext";
@@ -25,22 +26,136 @@ const ListItem = ({ title, subtitle, tag, tagColor }) => (
 export default function StudentProfile() {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const [profileUser, setProfileUser] = useState(user || null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [connectionsList, setConnectionsList] = useState([]);
+  const [enrolledItems, setEnrolledItems] = useState([]);
   const [membershipsLoading, setMembershipsLoading] = useState(false);
   const [activeMembershipList, setActiveMembershipList] = useState([]);
-  const pendingRequests = user?.connectionRequests?.filter(r => r.status === 'pending') || [];
-  const resolvedRequests = user?.connectionRequests?.filter(r => r.status !== 'pending') || [];
+  const profile = profileUser || user || {};
+
+  const currentUserId = String(profile?._id || "");
+  const normalizedConnections = connectionsList.map((row) => {
+    const from = row?.from;
+    const to = row?.to;
+    const partner = String(from?._id) === currentUserId ? to : from;
+    return {
+      _id: partner?._id,
+      name: partner?.name || "Unknown User",
+      title: partner?.title || "",
+      company: partner?.company || "",
+    };
+  }).filter((c) => c?._id);
+
+  const profileConnections = profile?.connections || [];
+  const displayConnections = normalizedConnections.length > 0 ? normalizedConnections : profileConnections;
+
+  const normalizedProfileCourses = (profile?.enrolledCourses || []).map((ec) => ({
+    title: ec?.course?.title || ec?.title || ec?.courseTitle || "Unknown Course",
+    enrolledAt: ec?.enrolledAt,
+  }));
+  const hasKnownProfileCourses = normalizedProfileCourses.some((item) => item.title !== "Unknown Course");
+  const fallbackCourses = enrolledItems
+    .filter((item) => item?.type === "course")
+    .map((item) => ({
+      title: item?.title || "Unknown Course",
+      enrolledAt: item?.createdAt || item?.updatedAt,
+    }));
+  const displayCourses = hasKnownProfileCourses || fallbackCourses.length === 0
+    ? normalizedProfileCourses
+    : fallbackCourses;
+
+  const normalizedProfileSessions = (profile?.enrolledSessions || []).map((es) => ({
+    title: es?.session?.title || es?.title || "Unknown Session",
+    date: es?.session?.date || es?.date,
+  }));
+  const hasKnownProfileSessions = normalizedProfileSessions.some((item) => item.title !== "Unknown Session");
+  const fallbackSessions = enrolledItems
+    .filter((item) => item?.type === "session" || item?.type === "workshop")
+    .map((item) => ({
+      title: item?.title || "Unknown Session",
+      date: item?.date,
+    }));
+  const displaySessions = hasKnownProfileSessions || fallbackSessions.length === 0
+    ? normalizedProfileSessions
+    : fallbackSessions;
 
   const stats = [
-    { label: "Connections",       value: user?.connections?.length || 0  },
-    { label: "Courses Enrolled",  value: user?.enrolledCourses?.length || 0   },
-    { label: "Sessions Attended", value: user?.enrolledSessions?.length || 0  },
-    { label: "Pending Requests",  value: pendingRequests.length  },
+    { label: "Connections",       value: displayConnections.length || 0  },
+    { label: "Courses Enrolled",  value: displayCourses.length || 0   },
+    { label: "Sessions Attended", value: displaySessions.length || 0  },
+    { label: "Certifications",    value: profile?.certifications?.length || 0 },
   ];
+
+  const completionChecks = [
+    { label: "Profile Photo", done: Boolean(profile?.avatar) },
+    { label: "About", done: Boolean(String(profile?.about || "").trim()) },
+    { label: "Skills", done: (profile?.skills || []).length > 0 },
+    { label: "Certifications", done: (profile?.certifications || []).length > 0 },
+    { label: "Education", done: (profile?.education || []).length > 0 },
+    { label: "Connections", done: displayConnections.length > 0 },
+  ];
+  const completedChecks = completionChecks.filter((item) => item.done).length;
+  const profileCompletionPercent = completionChecks.length
+    ? Math.round((completedChecks / completionChecks.length) * 100)
+    : 0;
+  const missingSections = completionChecks.filter((item) => !item.done).map((item) => item.label);
 
   const [open, setOpen] = useState(false);
   const [membershipModalOpen, setMembershipModalOpen] = useState(false);
   const previousMembershipList = [];
   const activeMemberships = activeMembershipList.length;
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchProfile = async () => {
+      setProfileLoading(true);
+      try {
+        const res = await API.get("/auth/me");
+        setProfileUser(res?.data?.user || user);
+      } catch (err) {
+        console.error("Failed to load student profile:", err);
+        setProfileUser(user);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchConnections = async () => {
+      try {
+        const res = await API.get("/connections");
+        setConnectionsList(res?.data?.connections || []);
+      } catch (err) {
+        console.error("Failed to load connections list:", err);
+        setConnectionsList([]);
+      }
+    };
+
+    fetchConnections();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchEnrolledItems = async () => {
+      try {
+        const res = await API.get("/users/me/enrolled");
+        setEnrolledItems(res?.data?.enrollments || []);
+      } catch (err) {
+        console.error("Failed to load enrolled items:", err);
+        setEnrolledItems([]);
+      }
+    };
+
+    fetchEnrolledItems();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -82,7 +197,8 @@ export default function StudentProfile() {
 
   const handleAvatarChange = async (base64) => {
     try {
-      await updateUser({ avatar: base64 });
+      const res = await updateUser({ avatar: base64 });
+      setProfileUser(res?.user || res || profile);
     } catch (err) {
       console.error("Avatar upload failed:", err);
       alert("Failed to upload profile photo. Please try again.");
@@ -91,7 +207,8 @@ export default function StudentProfile() {
 
   const handleCoverChange = async (base64) => {
     try {
-      await updateUser({ coverPhoto: base64 });
+      const res = await updateUser({ coverPhoto: base64 });
+      setProfileUser(res?.user || res || profile);
     } catch (err) {
       console.error("Cover photo upload failed:", err);
       alert("Failed to upload cover photo. Please try again.");
@@ -108,10 +225,22 @@ export default function StudentProfile() {
         </div>
 
         <ProfileCard
-          user={user}
+          user={profile}
           onEdit={() => setOpen(true)}
           onAvatarChange={handleAvatarChange}
           onCoverChange={handleCoverChange}
+        />
+
+        {profileLoading && (
+          <div style={{ padding: "10px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-3)", color: "var(--text-3)", fontSize: 12 }}>
+            Refreshing profile data from MongoDB...
+          </div>
+        )}
+
+        <ProfileCompletion
+          percent={profileCompletionPercent}
+          missing={missingSections}
+          onCompleteProfile={() => setOpen(true)}
         />
 
         <Stats stats={stats} />
@@ -120,16 +249,16 @@ export default function StudentProfile() {
           {/* Enrolled Courses */}
           <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
             <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Enrolled Courses</h3>
-            {user?.enrolledCourses?.length > 0 ? user.enrolledCourses.map((ec, i) => (
-              <ListItem key={i} title={ec.course?.title || "Unknown Course"} subtitle={`Enrolled: ${new Date(ec.enrolledAt).toLocaleDateString()}`} />
+            {displayCourses.length > 0 ? displayCourses.map((ec, i) => (
+              <ListItem key={i} title={ec.title || "Unknown Course"} subtitle={`Enrolled: ${ec.enrolledAt ? new Date(ec.enrolledAt).toLocaleDateString() : "Recently"}`} />
             )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No enrolled courses.</p>}
           </div>
 
           {/* Enrolled Sessions */}
           <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
             <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Enrolled Sessions</h3>
-            {user?.enrolledSessions?.length > 0 ? user.enrolledSessions.map((es, i) => (
-              <ListItem key={i} title={es.session?.title || "Unknown Session"} subtitle={`Date: ${es.session?.date ? new Date(es.session.date).toLocaleDateString() : 'TBD'}`} />
+            {displaySessions.length > 0 ? displaySessions.map((es, i) => (
+              <ListItem key={i} title={es.title || "Unknown Session"} subtitle={`Date: ${es.date ? new Date(es.date).toLocaleDateString() : 'TBD'}`} />
             )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No enrolled sessions.</p>}
           </div>
         </div>
@@ -137,29 +266,45 @@ export default function StudentProfile() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           {/* Connections */}
           <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
-            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Connections ({user?.connections?.length || 0})</h3>
-            {user?.connections?.length > 0 ? user.connections.map((c, i) => (
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Connections ({displayConnections.length || 0})</h3>
+            {displayConnections.length > 0 ? displayConnections.map((c, i) => (
               <ListItem key={i} title={c.name} subtitle={`${c.title || ""} at ${c.company || ""}`} />
             )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No connections yet.</p>}
           </div>
 
-          {/* Connection Requests */}
+          {/* Skills */}
           <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
-            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Connection Requests</h3>
-            {pendingRequests.length > 0 && <div>
-              <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 8 }}>Pending</h4>
-              {pendingRequests.map((r, i) => (
-                <ListItem key={`p${i}`} title={r.alumni?.name || "Unknown Alumni"} subtitle="Waiting for approval" tag="Pending" tagColor="#F5C842" />
-              ))}
-            </div>}
-            {resolvedRequests.length > 0 && <div style={{ marginTop: 12 }}>
-              <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 8 }}>Resolved</h4>
-              {resolvedRequests.map((r, i) => (
-                <ListItem key={`r${i}`} title={r.alumni?.name || "Unknown Alumni"} subtitle={`Status: ${r.status}`} tag={r.status} tagColor={r.status === 'accepted' ? '#10B981' : '#EF4444'} />
-              ))}
-            </div>}
-            {(pendingRequests.length === 0 && resolvedRequests.length === 0) && (
-              <p style={{ fontSize: 13, color: "var(--text-3)" }}>No connection requests.</p>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Skills</h3>
+            {profile?.skills?.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {profile.skills.map((skill, i) => (
+                  <span key={`${skill}-${i}`} style={{ fontSize: 12, fontWeight: 700, color: "var(--purple-light)", background: "rgba(124,92,252,0.12)", border: "1px solid rgba(124,92,252,0.28)", borderRadius: 99, padding: "5px 10px" }}>
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            ) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No skills added yet.</p>}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Certifications</h3>
+            {profile?.certifications?.length > 0 ? profile.certifications.map((cert, i) => (
+              <ListItem key={`${cert}-${i}`} title={cert} subtitle="Certification" tag="Verified" tagColor="#10B981" />
+            )) : <p style={{ fontSize: 13, color: "var(--text-3)" }}>No certifications added yet.</p>}
+          </div>
+
+          <div style={{ padding: 20, background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 18 }}>
+            <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16, fontWeight: 700 }}>Education Details</h3>
+            {profile?.education?.length > 0 ? profile.education.map((edu, i) => (
+              <ListItem
+                key={`${edu.institution || "education"}-${i}`}
+                title={`${edu.degree || "Degree"}${edu.fieldOfStudy ? ` - ${edu.fieldOfStudy}` : ""}`}
+                subtitle={`${edu.institution || "Institution"}${edu.startYear || edu.endYear ? ` (${edu.startYear || "?"} - ${edu.endYear || "Present"})` : ""}`}
+              />
+            )) : (
+              <p style={{ fontSize: 13, color: "var(--text-3)" }}>No education details added yet.</p>
             )}
           </div>
         </div>
@@ -303,10 +448,11 @@ export default function StudentProfile() {
 
         <Modal isOpen={open} onClose={() => setOpen(false)} title="Edit Profile" size="md">
           <EditProfile
-            user={user}
+            user={profile}
             onSave={async (updated) => {
               try {
-                await updateUser(updated);
+                const res = await updateUser(updated);
+                setProfileUser(res?.user || res || profile);
                 setOpen(false);
               } catch (err) {
                 console.error("Profile save failed:", err);

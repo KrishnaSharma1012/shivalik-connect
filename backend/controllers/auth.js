@@ -236,8 +236,7 @@ export const getMe = async (req, res) => {
         .select("-password")
         .populate("enrolledCourses.course", "title price thumbnail")
         .populate("enrolledSessions.session", "title date time")
-        .populate("connections", "name avatar college company title")
-        .populate("connectionRequests.alumni", "name avatar title");
+        .populate("connections", "name avatar college company title");
     } else if (user && user.role === "alumni") {
       user = await Alumni.findById(req.user._id)
         .select("-password")

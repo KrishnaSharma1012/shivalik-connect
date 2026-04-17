@@ -133,7 +133,7 @@ export const updateProfile = async (req, res) => {
   try {
     const { 
       name, email, about, title, skills, college, company, avatar, coverPhoto, alumniPlan,
-      joiningYear, passingYear, degree, branch
+      joiningYear, passingYear, degree, branch, certifications, education, domain, projects
     } = req.body;
 
     const updates = {};
@@ -143,17 +143,82 @@ export const updateProfile = async (req, res) => {
     if (about) updates.about = about;
     if (title) updates.title = title;
 
-    // ✅ FIX skills handling
-    if (skills) {
-      updates.skills = Array.isArray(skills) ? skills : skills.split(",");
+    if (skills !== undefined) {
+      updates.skills = Array.isArray(skills)
+        ? skills.map((s) => String(s).trim()).filter(Boolean)
+        : String(skills).split(",").map((s) => s.trim()).filter(Boolean);
     }
 
-    if (college) updates.college = college;
-    if (company) updates.company = company;
-    if (joiningYear) updates.joiningYear = joiningYear;
-    if (passingYear) updates.passingYear = passingYear;
-    if (degree) updates.degree = degree;
-    if (branch) updates.branch = branch;
+    if (certifications !== undefined) {
+      updates.certifications = Array.isArray(certifications)
+        ? certifications.map((c) => String(c).trim()).filter(Boolean)
+        : String(certifications).split(",").map((c) => c.trim()).filter(Boolean);
+    }
+
+    if (education !== undefined) {
+      const educationList = Array.isArray(education) ? education : [];
+      updates.education = educationList
+        .map((item = {}) => ({
+          institution: String(item.institution || "").trim(),
+          degree: String(item.degree || "").trim(),
+          fieldOfStudy: String(item.fieldOfStudy || "").trim(),
+          startYear: item.startYear ? Number(item.startYear) : undefined,
+          endYear: item.endYear ? Number(item.endYear) : undefined,
+          grade: String(item.grade || "").trim(),
+          description: String(item.description || "").trim(),
+        }))
+        .filter((item) => item.institution || item.degree || item.fieldOfStudy);
+
+      if (updates.education.length > 0) {
+        const firstEducation = updates.education[0];
+        updates.college = firstEducation.institution || college || "";
+        updates.degree = firstEducation.degree || degree || "";
+        if (firstEducation.startYear) updates.joiningYear = firstEducation.startYear;
+        if (firstEducation.endYear) updates.passingYear = firstEducation.endYear;
+      }
+    }
+
+    if (college !== undefined) updates.college = college;
+    if (company !== undefined) updates.company = company;
+    if (joiningYear !== undefined) updates.joiningYear = joiningYear || undefined;
+    if (passingYear !== undefined) updates.passingYear = passingYear || undefined;
+    if (degree !== undefined) updates.degree = degree;
+    if (branch !== undefined) updates.branch = branch;
+    if (domain !== undefined && req.user.role === "alumni") updates.domain = domain;
+
+    if (projects !== undefined && req.user.role === "alumni") {
+      const projectList = Array.isArray(projects) ? projects : [];
+
+      updates.projects = await Promise.all(
+        projectList.map(async (item = {}) => {
+          const title = String(item.title || "").trim();
+          const link = String(item.link || "").trim();
+          const description = String(item.description || "").trim();
+          const fileName = String(item.fileName || "").trim();
+          const fileType = String(item.fileType || "").trim();
+          let fileUrl = String(item.fileUrl || "").trim();
+
+          if (item.fileData && typeof item.fileData === "string" && item.fileData.startsWith("data:")) {
+            const uploaded = await uploadImage(item.fileData, "project_files");
+            fileUrl = uploaded.url;
+          }
+
+          return {
+            title,
+            link,
+            description,
+            fileUrl,
+            fileName,
+            fileType,
+            uploadedAt: new Date(),
+          };
+        })
+      );
+
+      updates.projects = updates.projects.filter(
+        (project) => project.title || project.link || project.description || project.fileUrl
+      );
+    }
 
     // ✅ Allow alumni plan upgrade from profile update
     if (alumniPlan && req.user.role === "alumni") {

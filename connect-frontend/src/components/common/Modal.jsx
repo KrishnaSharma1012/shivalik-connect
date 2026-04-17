@@ -42,6 +42,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" })
       <div style={{
         position: "relative", zIndex: 10,
         width: "100%", maxWidth: sizes[size],
+        maxHeight: "calc(100vh - 40px)",
         background: "var(--bg-2)",
         border: "1px solid var(--border-bright)",
         borderRadius: 22,
@@ -72,7 +73,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" })
         </div>
 
         {/* Body */}
-        <div style={{ padding: "22px" }}>
+        <div style={{ padding: "22px", maxHeight: "calc(100vh - 140px)", overflowY: "auto" }}>
           {children}
         </div>
       </div>
