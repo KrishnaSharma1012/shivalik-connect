@@ -18,6 +18,7 @@ import connectionRoutes from "./routes/Connection.js";
 import earningRoutes from "./routes/Earning.js";
 import adminRoutes from "./routes/Admin.js";
 import skillGapRoutes from "./routes/SkillGap.js";
+import p2pRoutes, { initP2PNetwork } from "./routes/P2P.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,10 +60,17 @@ app.use("/api/connections", connectionRoutes);
 app.use("/api/earnings", earningRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/skill-gap", skillGapRoutes);
+app.use("/api/p2p", p2pRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
+  // Automatically initialize P2P architecture after DB is likely connected
+  setTimeout(() => {
+    initP2PNetwork().catch(err => console.error("Failed to auto-init P2P:", err));
+  }, 2000);
+});

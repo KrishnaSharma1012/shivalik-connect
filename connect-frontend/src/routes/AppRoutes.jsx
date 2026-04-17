@@ -22,6 +22,7 @@ import MyLearning from "../pages/student/MyLearning";
 import MembershipAlumni from "../pages/student/MembershipAlumni";
 import AlumniItemDetail from "../pages/alumni/Dashboard/ItemDetail";
 import CareerPath from "../pages/student/Dashboard/CareerPath";
+import P2PDashboard from "../pages/student/P2PDashboard";
 
 // Alumni Pages
 import AlumniFeed from "../pages/alumni/Dashboard/Feed";
@@ -161,6 +162,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MyLearning />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/p2p-dashboard"
+        element={
+          <ProtectedRoute>
+            <P2PDashboard />
           </ProtectedRoute>
         }
       />
