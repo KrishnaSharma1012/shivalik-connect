@@ -249,5 +249,5 @@ def _get_common_gaps(results: list) -> list:
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5002))
+    port = int(os.getenv("PORT", 8002))
     app.run(debug=True, port=port)

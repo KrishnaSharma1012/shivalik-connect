@@ -9,7 +9,7 @@ const router = express.Router();
 const rawServiceUrl =
   process.env.SKILL_GAP_SERVICE_URL ||
   process.env.ML_SERVICE_URL ||
-  "http://localhost:5002";
+  "http://localhost:8002";
 
 const SKILL_GAP_SERVICE_URL = rawServiceUrl.replace(/\/predict\/?$/, "").replace(/\/$/, "");
 
