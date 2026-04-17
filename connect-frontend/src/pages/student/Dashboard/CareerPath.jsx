@@ -1,43 +1,53 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import MainLayout from "../../../components/layout/MainLayout";
 import { predictCareerPaths } from "../../../services/careerService";
-
-const DOMAINS = [
-  { name: "Software Engineering", icon: "💻" },
-  { name: "Data & AI",            icon: "🤖" },
-  { name: "Product Management",   icon: "🗺️" },
-  { name: "Design",               icon: "🎨" },
-  { name: "Finance",              icon: "📈" },
-  { name: "Marketing",            icon: "📣" },
-  { name: "Human Resources",      icon: "🤝" },
-  { name: "Sales & Business Development", icon: "🚀" },
-];
-
-const STEPS = ["Domain", "Skills", "Interests", "Results"];
+import { useAuth } from "../../../context/AuthContext";
 
 const scoreColor = (score) => {
   const n = parseFloat(score);
-  if (n >= 65) return "#00E5C3";
-  if (n >= 55) return "#9B7EFF";
-  return "#9494B8";
+  if (n >= 70) return "#00D4A3";
+  if (n >= 55) return "#4F8CFF";
+  return "#8893A8";
 };
 
 export default function CareerPath() {
-  const [step, setStep]         = useState(0);
-  const [domain, setDomain]     = useState("");
-  const [skills, setSkills]     = useState("");
+  const { user } = useAuth();
+  const [skills, setSkills] = useState("");
   const [interests, setInterests] = useState("");
-  const [results, setResults]   = useState(null);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState("");
 
-  async function handlePredict() {
+  useEffect(() => {
+    if (!user || loading) return;
+    const profileSkills = Array.isArray(user.skills) ? user.skills : [];
+    const profileInterests = typeof user.headline === "string" ? user.headline.trim() : "";
+
+    setSkills(profileSkills.join(", "));
+    setInterests(profileInterests);
+
+    if (profileSkills.length > 0) {
+      runAutoAnalysis(profileSkills.join(", "), profileInterests);
+    } else {
+      setError("No profile skills found. Add skills in your profile to auto-map career paths.");
+    }
+  }, [user]);
+
+  async function runAutoAnalysis(skillText, interestText) {
     setLoading(true);
     setError("");
+
     try {
-      const data = await predictCareerPaths({ skills, interests, domain });
+      const data = await predictCareerPaths({
+        skills: skillText,
+        interests: interestText,
+        domain: "All Domains",
+        topN: 4,
+      });
+
       setResults(data);
-      setStep(3);
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch {
       setError("Could not reach the ML API. Make sure uvicorn is running on port 8000.");
     } finally {
@@ -45,275 +55,450 @@ export default function CareerPath() {
     }
   }
 
-  function reset() {
-    setStep(0); setDomain(""); setSkills("");
-    setInterests(""); setResults(null); setError("");
-  }
+  const predictions = useMemo(() => results?.predictions || [], [results]);
+
+  const averageMatch = useMemo(() => {
+    if (!predictions.length) return 0;
+    const total = predictions.reduce((sum, item) => sum + parseFloat(item.match_score || "0"), 0);
+    return Math.round(total / predictions.length);
+  }, [predictions]);
+
+  const totalMissingSkills = useMemo(() => {
+    const missing = new Set();
+    predictions.forEach((p) => (p.missing_skills || []).forEach((s) => missing.add(s)));
+    return missing.size;
+  }, [predictions]);
+
+  const topSkillSet = useMemo(() => {
+    const matched = new Set();
+    predictions.forEach((p) => (p.matched_skills || []).forEach((s) => matched.add(s)));
+    return Array.from(matched).slice(0, 8);
+  }, [predictions]);
+
+  const canRefresh = skills.trim().length > 0;
 
   return (
     <MainLayout>
-      <div style={{ padding: "28px 0", maxWidth: 640, margin: "0 auto" }}>
-
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 800, fontSize: 24, color: "var(--text)", marginBottom: 4 }}>
-            Career Path Predictor
-          </h1>
-          <p style={{ fontSize: 14, color: "var(--text-3)" }}>
-            Tell us your skills and interests — we'll match you to real career paths.
-          </p>
-        </div>
-
-        {/* Progress stepper */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 32, gap: 0 }}>
-          {STEPS.map((label, i) => (
-            <React.Fragment key={label}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700,
-                  background: i < step ? "var(--purple)" : i === step ? "linear-gradient(135deg,#7C5CFC,#9B7EFF)" : "var(--bg-4)",
-                  color: i <= step ? "#fff" : "var(--text-3)",
-                  border: i === step ? "2px solid rgba(124,92,252,0.5)" : "2px solid transparent",
-                  boxShadow: i === step ? "0 0 12px rgba(124,92,252,0.4)" : "none",
-                  transition: "all 0.3s",
-                }}>
-                  {i < step ? "✓" : i + 1}
-                </div>
-                <span style={{ fontSize: 11, color: i <= step ? "var(--purple-light)" : "var(--text-3)", fontWeight: i === step ? 600 : 400 }}>
-                  {label}
-                </span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div style={{
-                  flex: 1, height: 2, marginBottom: 18,
-                  background: i < step ? "var(--purple)" : "var(--bg-4)",
-                  transition: "background 0.3s",
-                }} />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Card */}
-        <div style={{
-          background: "var(--bg-2)",
-          border: "1px solid var(--border)",
-          borderRadius: 18,
-          padding: "28px 24px",
-          animation: "fadeUp 0.3s ease",
-        }}>
-
-          {/* Step 0 — Domain */}
-          {step === 0 && (
-            <div>
-              <h2 style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18, marginBottom: 6, color: "var(--text)" }}>
-                What field are you aiming for?
-              </h2>
-              <p style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 20 }}>
-                Pick the domain that excites you most.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
-                {DOMAINS.map((d) => (
-                  <button
-                    key={d.name}
-                    onClick={() => setDomain(d.name)}
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: 12,
-                      border: `1px solid ${domain === d.name ? "rgba(124,92,252,0.5)" : "var(--border)"}`,
-                      background: domain === d.name ? "rgba(124,92,252,0.12)" : "var(--bg-3)",
-                      color: domain === d.name ? "var(--purple-light)" : "var(--text-2)",
-                      fontSize: 13,
-                      fontWeight: domain === d.name ? 600 : 400,
-                      textAlign: "left",
-                      cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 8,
-                      transition: "all 0.15s",
-                      boxShadow: domain === d.name ? "0 0 0 1px rgba(124,92,252,0.3)" : "none",
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{d.icon}</span>
-                    <span>{d.name}</span>
-                  </button>
-                ))}
-              </div>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 0 40px" }}>
+        <section style={heroStyle}>
+          <div style={{ position: "relative", zIndex: 2 }}>
+            <p style={heroTag}>AUTOMATED SKILL MAPPER</p>
+            <h1 style={heroTitle}>Career Map from your profile skills</h1>
+            <p style={heroSubtitle}>
+              Skills are fetched automatically, analyzed against your dataset, and mapped to the top 4 career options with stage-by-stage roadmaps.
+            </p>
+            <div style={heroActions}>
               <button
-                disabled={!domain}
-                onClick={() => setStep(1)}
-                style={btnStyle(!domain)}
+                disabled={!canRefresh || loading}
+                style={primaryButton(!canRefresh || loading)}
+                onClick={() => runAutoAnalysis(skills, interests)}
               >
-                Next →
+                {loading ? "Running analysis..." : "Refresh mapping"}
               </button>
+              <span style={lastUpdatedStyle}>
+                {lastUpdated ? `Updated: ${lastUpdated}` : "Waiting for first analysis"}
+              </span>
             </div>
+          </div>
+          <div style={heroGlow} />
+        </section>
+
+        <section style={controlsPanel}>
+          <div>
+            <p style={fieldLabel}>Skills from profile</p>
+            <textarea
+              value={skills}
+              onChange={(e) => setSkills(e.target.value)}
+              rows={3}
+              style={inputBox}
+              placeholder="Add skills in profile or edit here"
+            />
+          </div>
+          <div>
+            <p style={fieldLabel}>Interests (optional)</p>
+            <textarea
+              value={interests}
+              onChange={(e) => setInterests(e.target.value)}
+              rows={3}
+              style={inputBox}
+              placeholder="Optional interests to improve ranking"
+            />
+          </div>
+        </section>
+
+        {error && <div style={errorBanner}>{error}</div>}
+
+        <section style={kpiGrid}>
+          <StatCard title="Mapped careers" value={String(predictions.length)} helper="Auto-selected top options" />
+          <StatCard title="Average fit" value={`${averageMatch}%`} helper="Across mapped careers" />
+          <StatCard title="Skill gaps" value={String(totalMissingSkills)} helper="Unique missing skills" />
+          <StatCard title="Strongest skills" value={String(topSkillSet.length)} helper="Matched in recommendations" />
+        </section>
+
+        <section style={{ marginTop: 18 }}>
+          {loading && <div style={loadingBanner}>Mapping careers from your skills...</div>}
+          {!loading && predictions.length === 0 && !error && (
+            <div style={emptyState}>No mapped careers yet. Add profile skills and click Refresh mapping.</div>
           )}
 
-          {/* Step 1 — Skills */}
-          {step === 1 && (
-            <div>
-              <h2 style={headingStyle}>What are your skills?</h2>
-              <p style={subStyle}>List tools, languages, or abilities you have. Separate with commas.</p>
-              <textarea
-                style={textareaStyle}
-                placeholder="e.g. Python, SQL, data visualization, statistics, machine learning"
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                rows={4}
-                autoFocus
-              />
-              <div style={rowStyle}>
-                <button style={backBtnStyle} onClick={() => setStep(0)}>← Back</button>
-                <button disabled={!skills.trim()} onClick={() => setStep(2)} style={btnStyle(!skills.trim())}>
-                  Next →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2 — Interests */}
-          {step === 2 && (
-            <div>
-              <h2 style={headingStyle}>What interests you?</h2>
-              <p style={subStyle}>Describe what you enjoy doing or want to work on — be specific.</p>
-              <textarea
-                style={textareaStyle}
-                placeholder="e.g. I love finding patterns in data and building models that solve real-world problems"
-                value={interests}
-                onChange={(e) => setInterests(e.target.value)}
-                rows={4}
-                autoFocus
-              />
-              {error && (
-                <p style={{ color: "var(--danger)", fontSize: 12, marginBottom: 12, padding: "8px 12px", background: "rgba(255,75,110,0.1)", borderRadius: 8 }}>
-                  ⚠️ {error}
-                </p>
-              )}
-              <div style={rowStyle}>
-                <button style={backBtnStyle} onClick={() => setStep(1)}>← Back</button>
-                <button
-                  disabled={!interests.trim() || loading}
-                  onClick={handlePredict}
-                  style={btnStyle(!interests.trim() || loading)}
-                >
-                  {loading ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
-                      Analyzing...
-                    </span>
-                  ) : "Find my paths →"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 — Results */}
-          {step === 3 && results && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <h2 style={headingStyle}>Your career paths</h2>
-                <span style={{ fontSize: 11, background: "var(--bg-4)", color: "var(--text-3)", padding: "3px 10px", borderRadius: 99 }}>
-                  {domain}
-                </span>
-              </div>
-              <p style={{ ...subStyle, marginBottom: 20 }}>
-                Based on your skills and interests — ranked by match strength.
-              </p>
-
-              {results.predictions.map((p, i) => (
-                <div key={i} style={{
-                  background: "var(--bg-3)",
-                  border: `1px solid ${i === 0 ? "rgba(124,92,252,0.3)" : "var(--border)"}`,
-                  borderRadius: 14,
-                  padding: "16px 18px",
-                  marginBottom: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  animation: `fadeUp 0.3s ease both`,
-                  animationDelay: `${i * 80}ms`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 10,
-                      background: i === 0 ? "rgba(124,92,252,0.2)" : "var(--bg-4)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 700, color: i === 0 ? "var(--purple-light)" : "var(--text-3)",
-                    }}>
-                      {i + 1}
-                    </div>
-                    <div>
-                      <p style={{ fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>
-                        {p.career_path}
-                      </p>
-                      <p style={{ fontSize: 12, color: "var(--text-3)" }}>{p.experience_level}</p>
-                    </div>
+          <div style={careerGrid}>
+            {predictions.map((prediction, index) => (
+              <article key={`${prediction.career_path}-${index}`} style={careerCard(index)}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 10 }}>
+                  <div>
+                    <p style={rankTag}>Rank #{index + 1}</p>
+                    <h3 style={careerTitle}>{prediction.career_path}</h3>
+                    <p style={careerMeta}>{prediction.domain} | {prediction.experience_level}</p>
                   </div>
-                  <div style={{
-                    background: `rgba(${scoreColor(p.match_score) === "#00E5C3" ? "0,229,195" : scoreColor(p.match_score) === "#9B7EFF" ? "155,126,255" : "148,148,184"}, 0.15)`,
-                    color: scoreColor(p.match_score),
-                    borderRadius: 99, padding: "4px 12px",
-                    fontSize: 13, fontWeight: 700,
-                    fontFamily: "Plus Jakarta Sans",
-                  }}>
-                    {p.match_score}
+                  <span style={scorePill(prediction.match_score)}>{prediction.match_score}</span>
+                </div>
+
+                <div style={{ marginTop: 14 }}>
+                  <RoadmapLineChart
+                    roadmap={prediction.roadmap || []}
+                    currentStageIndex={prediction.current_stage_index}
+                  />
+                  <p style={currentPointLabel}>Current stage: {prediction.current_stage_label}</p>
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <p style={skillGroupLabel}>Skills you already have</p>
+                  <div style={chipWrap}>
+                    {(prediction.matched_skills || []).slice(0, 6).map((skill) => (
+                      <span key={`${prediction.career_path}-${skill}`} style={matchedChip}>{skill}</span>
+                    ))}
+                    {(prediction.matched_skills || []).length === 0 && <span style={mutedSmall}>No direct skill matches yet</span>}
                   </div>
                 </div>
-              ))}
 
-              <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
-                <button style={backBtnStyle} onClick={reset}>
-                  Start over
-                </button>
-                <button
-                  style={{ ...btnStyle(false), flex: 1 }}
-                  onClick={() => { setStep(0); setResults(null); setDomain(""); setSkills(""); setInterests(""); }}
-                >
-                  Try another domain →
-                </button>
-              </div>
-            </div>
-          )}
-
-        </div>
+                <div style={{ marginTop: 10 }}>
+                  <p style={skillGroupLabel}>Skills to build next</p>
+                  <div style={chipWrap}>
+                    {(prediction.missing_skills || []).slice(0, 6).map((skill) => (
+                      <span key={`missing-${prediction.career_path}-${skill}`} style={missingChip}>+ {skill}</span>
+                    ))}
+                    {(prediction.missing_skills || []).length === 0 && <span style={mutedSmall}>Great coverage for this role</span>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </MainLayout>
   );
 }
 
-// ── Shared styles ──────────────────────────────────────────
-const headingStyle = {
-  fontFamily: "Plus Jakarta Sans", fontWeight: 700, fontSize: 18,
-  color: "var(--text)", marginBottom: 6,
+function RoadmapLineChart({ roadmap = [], currentStageIndex = 0 }) {
+  if (!Array.isArray(roadmap) || roadmap.length === 0) return null;
+
+  const width = 520;
+  const height = 180;
+  const padX = 26;
+  const padY = 20;
+  const xStep = roadmap.length > 1 ? (width - padX * 2) / (roadmap.length - 1) : 0;
+
+  const toPoint = (item, idx) => {
+    const x = padX + idx * xStep;
+    const y = padY + ((100 - Number(item.readiness || 0)) / 100) * (height - padY * 2);
+    return { x, y };
+  };
+
+  const points = roadmap.map(toPoint);
+  const polyline = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const currentPoint = points[Math.max(0, Math.min(currentStageIndex, points.length - 1))];
+
+  return (
+    <div style={{ width: "100%", overflowX: "auto", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, background: "rgba(6,12,22,0.55)" }}>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", minWidth: 320, height: 180 }}>
+        <line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+        <line x1={padX} y1={padY} x2={padX} y2={height - padY} stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+        <polyline
+          points={polyline}
+          fill="none"
+          stroke="#41D1FF"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {points.map((p, idx) => (
+          <g key={idx}>
+            <circle cx={p.x} cy={p.y} r={idx === currentStageIndex ? 5.5 : 3.5} fill={idx === currentStageIndex ? "#00D4A3" : "#4F8CFF"} />
+            <text x={p.x} y={height - 7} textAnchor="middle" fill="rgba(255,255,255,0.64)" style={{ fontSize: 9 }}>
+              {roadmap[idx]?.stage}
+            </text>
+          </g>
+        ))}
+
+        {currentPoint && (
+          <>
+            <line x1={currentPoint.x} y1={padY} x2={currentPoint.x} y2={height - padY} stroke="#00D4A3" strokeDasharray="4 3" />
+            <text x={currentPoint.x + 8} y={padY + 10} fill="#00D4A3" style={{ fontSize: 10, fontWeight: 700 }}>
+              Current
+            </text>
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function StatCard({ title, value, helper }) {
+  return (
+    <div style={statCard}>
+      <p style={statTitle}>{title}</p>
+      <p style={statValue}>{value}</p>
+      <p style={statHelper}>{helper}</p>
+    </div>
+  );
+}
+
+const heroStyle = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: 18,
+  border: "1px solid rgba(65,209,255,0.28)",
+  background: "radial-gradient(circle at 78% 16%, rgba(65,209,255,0.22), transparent 36%), linear-gradient(135deg, #0a1220 0%, #0f1f2e 52%, #102b22 100%)",
+  padding: "26px 24px",
 };
-const subStyle = {
-  fontSize: 13, color: "var(--text-3)", marginBottom: 18,
+
+const heroGlow = {
+  position: "absolute",
+  right: -120,
+  top: -120,
+  width: 280,
+  height: 280,
+  borderRadius: "50%",
+  filter: "blur(26px)",
+  background: "rgba(0,212,163,0.18)",
 };
-const textareaStyle = {
-  width: "100%", padding: "12px 14px",
-  background: "var(--bg-3)", border: "1px solid var(--border)",
-  borderRadius: 12, color: "var(--text)", fontSize: 14,
-  fontFamily: "DM Sans", resize: "vertical",
-  outline: "none", marginBottom: 16,
-  lineHeight: 1.6,
+
+const heroTag = {
+  margin: 0,
+  color: "#87d8ff",
+  fontWeight: 700,
+  letterSpacing: 1,
+  fontSize: 11,
 };
-const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center" };
-const btnStyle = (disabled) => ({
-  background: disabled ? "var(--bg-4)" : "linear-gradient(135deg, #7C5CFC, #9B7EFF)",
-  color: disabled ? "var(--text-3)" : "#fff",
-  border: "none", borderRadius: 10,
-  padding: "11px 22px", fontSize: 14, fontWeight: 600,
+
+const heroTitle = {
+  margin: "8px 0 8px",
+  color: "#F6FBFF",
+  fontSize: 30,
+  lineHeight: 1.1,
   fontFamily: "Plus Jakarta Sans",
+  maxWidth: 740,
+};
+
+const heroSubtitle = {
+  margin: 0,
+  color: "rgba(246,251,255,0.78)",
+  maxWidth: 760,
+  fontSize: 14,
+  lineHeight: 1.5,
+};
+
+const heroActions = {
+  marginTop: 18,
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
+  flexWrap: "wrap",
+};
+
+const lastUpdatedStyle = {
+  fontSize: 12,
+  color: "rgba(246,251,255,0.7)",
+};
+
+const primaryButton = (disabled) => ({
+  border: "none",
+  borderRadius: 10,
+  padding: "11px 16px",
+  fontSize: 14,
+  fontWeight: 700,
   cursor: disabled ? "not-allowed" : "pointer",
-  opacity: disabled ? 0.6 : 1,
-  boxShadow: disabled ? "none" : "0 4px 14px rgba(124,92,252,0.3)",
-  transition: "all 0.2s",
+  background: disabled ? "rgba(255,255,255,0.15)" : "linear-gradient(135deg, #41D1FF 0%, #00D4A3 100%)",
+  color: disabled ? "rgba(255,255,255,0.64)" : "#06202a",
+  boxShadow: disabled ? "none" : "0 10px 24px rgba(65,209,255,0.26)",
+  transition: "all .18s ease",
 });
-const backBtnStyle = {
-  background: "transparent", border: "1px solid var(--border)",
-  borderRadius: 10, padding: "11px 18px",
-  fontSize: 14, color: "var(--text-2)",
-  cursor: "pointer", fontFamily: "DM Sans",
+
+const controlsPanel = {
+  marginTop: 16,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 12,
+};
+
+const fieldLabel = {
+  margin: "0 0 6px",
+  color: "var(--text-3)",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const inputBox = {
+  width: "100%",
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--bg-2)",
+  color: "var(--text)",
+  padding: "10px 12px",
+  fontSize: 13,
+  resize: "vertical",
+  outline: "none",
+};
+
+const errorBanner = {
+  marginTop: 14,
+  background: "rgba(235,87,87,0.12)",
+  border: "1px solid rgba(235,87,87,0.34)",
+  color: "#FF9D9D",
+  borderRadius: 12,
+  padding: "10px 12px",
+  fontSize: 13,
+};
+
+const loadingBanner = {
+  borderRadius: 12,
+  padding: "10px 12px",
+  fontSize: 13,
+  border: "1px solid rgba(65,209,255,0.25)",
+  background: "rgba(65,209,255,0.12)",
+  color: "#93e4ff",
+};
+
+const emptyState = {
+  borderRadius: 12,
+  padding: "10px 12px",
+  fontSize: 13,
+  border: "1px solid var(--border)",
+  background: "var(--bg-2)",
+  color: "var(--text-3)",
+};
+
+const kpiGrid = {
+  marginTop: 16,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+};
+
+const statCard = {
+  background: "var(--bg-2)",
+  borderRadius: 14,
+  border: "1px solid var(--border)",
+  padding: "12px 12px 11px",
+};
+
+const statTitle = {
+  margin: 0,
+  fontSize: 11,
+  color: "var(--text-3)",
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
+};
+
+const statValue = {
+  margin: "8px 0 2px",
+  fontSize: 26,
+  color: "var(--text)",
+  fontFamily: "Plus Jakarta Sans",
+  fontWeight: 800,
+};
+
+const statHelper = {
+  margin: 0,
+  fontSize: 12,
+  color: "var(--text-3)",
+};
+
+const careerGrid = {
+  marginTop: 12,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gap: 12,
+};
+
+const careerCard = (index) => ({
+  background: "linear-gradient(180deg, rgba(13,18,31,0.98) 0%, rgba(12,23,37,0.98) 100%)",
+  borderRadius: 16,
+  border: index === 0 ? "1px solid rgba(0,212,163,0.52)" : "1px solid rgba(65,209,255,0.26)",
+  padding: 14,
+  boxShadow: index === 0 ? "0 10px 30px rgba(0,212,163,0.16)" : "0 8px 24px rgba(0,0,0,0.22)",
+});
+
+const rankTag = {
+  margin: 0,
+  fontSize: 11,
+  color: "#87d8ff",
+  fontWeight: 700,
+};
+
+const careerTitle = {
+  margin: "4px 0 4px",
+  color: "#F4FBFF",
+  fontFamily: "Plus Jakarta Sans",
+  fontSize: 18,
+  lineHeight: 1.2,
+};
+
+const careerMeta = {
+  margin: 0,
+  color: "rgba(244,251,255,0.72)",
+  fontSize: 12,
+};
+
+const scorePill = (score) => ({
+  fontSize: 13,
+  fontWeight: 800,
+  borderRadius: 999,
+  padding: "4px 9px",
+  color: scoreColor(score),
+  background: `color-mix(in srgb, ${scoreColor(score)} 20%, transparent)`,
+  border: `1px solid color-mix(in srgb, ${scoreColor(score)} 50%, transparent)`,
+});
+
+const currentPointLabel = {
+  margin: "8px 0 0",
+  color: "#8DEFD4",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const skillGroupLabel = {
+  margin: "0 0 6px",
+  fontSize: 12,
+  color: "rgba(244,251,255,0.74)",
+};
+
+const chipWrap = {
+  display: "flex",
+  gap: 6,
+  flexWrap: "wrap",
+};
+
+const matchedChip = {
+  fontSize: 11,
+  padding: "4px 8px",
+  borderRadius: 999,
+  color: "#00D4A3",
+  border: "1px solid rgba(0,212,163,0.44)",
+  background: "rgba(0,212,163,0.13)",
+};
+
+const missingChip = {
+  fontSize: 11,
+  padding: "4px 8px",
+  borderRadius: 999,
+  color: "#FFCE7A",
+  border: "1px solid rgba(255,206,122,0.42)",
+  background: "rgba(255,206,122,0.12)",
+};
+
+const mutedSmall = {
+  color: "rgba(255,255,255,0.52)",
+  fontSize: 11,
 };

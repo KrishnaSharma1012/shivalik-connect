@@ -15,7 +15,7 @@ const router = express.Router();
 const axios = require("axios");
 
 // ── Config ──────────────────────────────────────────────────
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:5001";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8001";
 
 // Models — import from your existing mongoose models
 const Student = require("../models/Student");   // your students model
