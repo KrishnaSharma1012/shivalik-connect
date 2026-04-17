@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ImageCropper from "./ImageCropper";
 
 const EditIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,6 +30,8 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
   const coverRef = useRef();
   const [avatarHover, setAvatarHover] = useState(false);
   const [coverHover, setCoverHover] = useState(false);
+  const [cropImage, setCropImage] = useState(null);
+  const [cropType, setCropType] = useState(null);
 
   const formatYear = (dateValue) => {
     if (!dateValue) return "—";
@@ -66,7 +69,8 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
     if (!file) return;
     try {
       const base64 = await toBase64(file);
-      onAvatarChange && onAvatarChange(base64);
+      setCropImage(base64);
+      setCropType("avatar");
     } catch (err) {
       console.error("Avatar file read failed:", err);
     }
@@ -77,13 +81,25 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
     if (!file) return;
     try {
       const base64 = await toBase64(file);
-      onCoverChange && onCoverChange(base64);
+      setCropImage(base64);
+      setCropType("cover");
     } catch (err) {
       console.error("Cover file read failed:", err);
     }
   };
 
+  const handleCropComplete = (croppedImage) => {
+    if (cropType === "avatar") {
+      onAvatarChange && onAvatarChange(croppedImage);
+    } else if (cropType === "cover") {
+      onCoverChange && onCoverChange(croppedImage);
+    }
+    setCropImage(null);
+    setCropType(null);
+  };
+
   return (
+    <>
     <div style={{
       background: "var(--bg-3)",
       border: "1px solid var(--border)",
@@ -348,5 +364,20 @@ export default function ProfileCard({ user = {}, onEdit, onAvatarChange, onCover
         )}
       </div>
     </div>
+
+    {/* Image Cropper Modal */}
+    {cropImage && (
+      <ImageCropper
+        imageSrc={cropImage}
+        isCover={cropType === "cover"}
+        onCrop={handleCropComplete}
+        onCancel={() => {
+          setCropImage(null);
+          setCropType(null);
+        }}
+        aspectRatio={cropType === "cover" ? 4 / 3 : 1}
+      />
+    )}
+  </>
   );
 }
