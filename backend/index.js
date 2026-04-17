@@ -17,6 +17,7 @@ import messageRoutes from "./routes/Message.js";
 import connectionRoutes from "./routes/Connection.js";
 import earningRoutes from "./routes/Earning.js";
 import adminRoutes from "./routes/Admin.js";
+import skillGapRoutes from "./routes/SkillGap.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,6 +58,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/connections", connectionRoutes);
 app.use("/api/earnings", earningRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/skill-gap", skillGapRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

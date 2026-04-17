@@ -41,6 +41,7 @@ import Courses from "../pages/admin/Courses";
 import SessionsAdmin from "../pages/admin/Sessions";
 import Analytics from "../pages/admin/Analytics";
 import AdminProfile from "../pages/admin/Profile";
+import SkillGapDashboard from "../pages/SkillGapDashboard"
 
 // Live Class
 import LiveClass from "../pages/common/LiveClass";
@@ -57,6 +58,14 @@ function AppRoutes() {
       <Route path="/signup" element={<Signup />} />
 
       {/* 🔐 Student Routes */}
+      <Route
+        path="/skill-gap"
+        element={
+          <ProtectedRoute>
+            <SkillGapDashboard />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/career-path"
         element={
