@@ -222,7 +222,6 @@ export default function PostCard({ post, onOpenProfile }) {
             )}
           </div>
         </div>
-        <button style={{ background: "none", border: "none", color: "var(--text-3)", fontSize: 18, cursor: "pointer", padding: "0 4px" }}>···</button>
       </div>
 
       {/* Content */}
