@@ -195,16 +195,58 @@ def predict(request: PredictRequest):
                 seen.add(token)
         return deduped
 
-    def build_roadmap(readiness_percent: float) -> tuple[list[dict[str, float | str]], int]:
+    def build_roadmap(
+        readiness_percent: float,
+        job_skills: set[str],
+        matched_skills: list[str],
+        similarity_score: float,
+    ) -> tuple[list[dict[str, float | str]], int]:
         roadmap = []
-        stage_cap = [20, 40, 60, 80, 100]
+
+        # Spread role-specific skills across stages so each career path has its own curve.
+        ordered_skills = sorted(job_skills)
+        stage_count = len(ROADMAP_STAGES)
+        stage_skill_groups = [ordered_skills[idx::stage_count] for idx in range(stage_count)]
+
+        matched_set = set(matched_skills)
+        cumulative_required = 0
+        cumulative_matched = 0
+        role_complexity = max(0.85, min(1.6, len(ordered_skills) / 6))
+        stage_difficulty = [0.88, 0.96, 1.04, 1.14, 1.24]
+
         for idx, stage in enumerate(ROADMAP_STAGES):
-            value = min(readiness_percent, stage_cap[idx])
-            normalized = round((value / stage_cap[idx]) * 100, 1)
+            group = stage_skill_groups[idx]
+            required_in_stage = len(group)
+            matched_in_stage = sum(1 for s in group if s in matched_set)
+
+            cumulative_required += required_in_stage
+            cumulative_matched += matched_in_stage
+
+            cumulative_coverage = (cumulative_matched / max(cumulative_required, 1)) * 100
+            stage_coverage = (matched_in_stage / max(required_in_stage, 1)) * 100
+            progression_bonus = ((idx + 1) / stage_count) * 6
+
+            blended_signal = (
+                (stage_coverage * 0.45)
+                + (cumulative_coverage * 0.25)
+                + (similarity_score * 0.30)
+            )
+
+            stage_readiness = round(
+                min(
+                    100,
+                    max(
+                        3,
+                        (blended_signal / (role_complexity * stage_difficulty[idx])) + progression_bonus,
+                    ),
+                ),
+                1,
+            )
+
             roadmap.append({
                 "stage": stage,
                 "stage_index": idx,
-                "readiness": normalized,
+                "readiness": stage_readiness,
             })
 
         if readiness_percent >= 80:
@@ -235,7 +277,12 @@ def predict(request: PredictRequest):
         if job_skills:
             coverage = (len(matched_skills) / len(job_skills)) * 100
         readiness_percent = round((coverage * 0.6) + (similarity_score * 0.4), 1)
-        roadmap, current_stage_index = build_roadmap(readiness_percent)
+        roadmap, current_stage_index = build_roadmap(
+            readiness_percent=readiness_percent,
+            job_skills=job_skills,
+            matched_skills=matched_skills,
+            similarity_score=similarity_score,
+        )
 
         if title not in seen_titles:
             seen_titles.add(title)

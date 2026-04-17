@@ -85,6 +85,7 @@ export default function Login() {
       const data = await loginUser({
         email: form.email,
         password: form.password,
+        role: form.role,
       });
 
       localStorage.setItem("token", data.token);

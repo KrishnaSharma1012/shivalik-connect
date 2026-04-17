@@ -153,6 +153,12 @@ export const googleAuth = async (req, res) => {
   try {
     const { email, name, avatar, role } = req.body;
      let user = await findUserByEmail(email, { includePassword: true });
+
+    if (user && role && user.role !== role) {
+      return res.status(403).json({
+        message: `This account is registered as ${user.role}. Please select ${user.role} to continue.`,
+      });
+    }
     
     if (!user) {
        const userModel = getUserModelByRole(role || "student");
@@ -190,11 +196,17 @@ export const googleAuth = async (req, res) => {
 // ─────────────────────────────────────────────
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     const user = await findUserByEmail(email, { includePassword: true });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        message: `This account is registered as ${user.role}. Please select ${user.role} to continue.`,
+      });
     }
 
     // compare password

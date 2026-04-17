@@ -79,7 +79,7 @@ export default function CareerPath() {
 
   return (
     <MainLayout>
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 0 40px" }}>
+      <div style={pageShell}>
         <section style={heroStyle}>
           <div style={{ position: "relative", zIndex: 2 }}>
             <p style={heroTag}>AUTOMATED SKILL MAPPER</p>
@@ -386,6 +386,13 @@ const kpiGrid = {
   gap: 10,
 };
 
+const pageShell = {
+  width: "100%",
+  maxWidth: 1400,
+  margin: "0 auto",
+  padding: "24px clamp(12px, 2vw, 24px) 40px",
+};
+
 const statCard = {
   background: "var(--bg-2)",
   borderRadius: 14,
@@ -418,7 +425,7 @@ const statHelper = {
 const careerGrid = {
   marginTop: 12,
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
   gap: 12,
 };
 

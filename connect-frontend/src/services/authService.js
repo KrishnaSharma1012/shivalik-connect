@@ -1,8 +1,8 @@
 import API from "../utils/api";
 
 // 🔑 Login
-export async function loginUser({ email, password }) {
-  const res = await API.post("/auth/login", { email, password });
+export async function loginUser({ email, password, role }) {
+  const res = await API.post("/auth/login", { email, password, role });
   return res.data;
 }
 
@@ -22,4 +22,4 @@ export async function logoutUser() {
 export async function googleAuth(payload) {
   const res = await API.post("/auth/google", payload);
   return res.data;
-}
+}
