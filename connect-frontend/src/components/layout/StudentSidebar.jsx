@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { getConversations } from "../../services/chatService";
 
 const icons = {
   CareerPath: (
@@ -71,18 +72,57 @@ const icons = {
 const navItems = [
   { name: "CareerPath", label: "Career Path", path: "/career-path" },
   { name: "SkillGap", label: "Skill Gap", path: "/skill-gap" },
-  { name: "Feed",       path: "/feed"        },
-  { name: "Networking", path: "/networking"  },
-  { name: "Connections", path: "/connections"  },
-  { name: "Academics",  path: "/academics"   },
+  { name: "Feed", path: "/feed" },
+  { name: "Networking", path: "/networking" },
+  { name: "Connections", path: "/connections" },
+  { name: "Academics", path: "/academics" },
   { name: "MyLearning", label: "My Learning", path: "/my-learning" },
   { name: "Membership", label: "Memberships", path: "/membership-alumni" },
-  { name: "Messages",   path: "/messages", badge: 2 },
-  { name: "Profile",    path: "/profile"     },
+  { name: "Messages", path: "/messages" },
+  { name: "Profile", path: "/profile" },
 ];
 
 export default function StudentSidebar() {
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshUnreadCount = async () => {
+      try {
+        const data = await getConversations();
+        const totalUnread = (data?.conversations || []).reduce(
+          (sum, row) => sum + Number(row?.unread || 0),
+          0
+        );
+
+        if (isMounted) {
+          setUnreadCount(totalUnread);
+        }
+      } catch {
+        if (isMounted) {
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    refreshUnreadCount();
+    const intervalId = setInterval(refreshUnreadCount, 15000);
+    const onFocus = () => refreshUnreadCount();
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [location.pathname]);
+
+  const computedNavItems = navItems.map((item) =>
+    item.name === "Messages" ? { ...item, badge: unreadCount > 0 ? unreadCount : undefined } : item
+  );
 
   return (
     <div style={{
@@ -106,7 +146,7 @@ export default function StudentSidebar() {
 
       {/* Nav items */}
       <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {navItems.map(item => {
+        {computedNavItems.map(item => {
           const active = location.pathname === item.path;
           return (
             <Link key={item.path} to={item.path} style={{ textDecoration: "none" }}>

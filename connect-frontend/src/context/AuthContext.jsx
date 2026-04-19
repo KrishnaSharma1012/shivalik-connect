@@ -29,10 +29,15 @@ export function AuthProvider({ children }) {
           localStorage.setItem("user", JSON.stringify(resolvedUser));
         } catch (err) {
           console.error("Auth initialization failed", err);
-          localStorage.removeItem("token");
-          localStorage.removeItem("userId");
-          localStorage.removeItem("user");
-          setUser(null);
+          const status = err?.response?.status;
+
+          // Only clear session when token is invalid/expired.
+          if (status === 401 || status === 403) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("userId");
+            localStorage.removeItem("user");
+            setUser(null);
+          }
         }
       }
       setLoading(false);
